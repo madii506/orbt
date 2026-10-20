@@ -7,7 +7,8 @@
   // ---------- 01 the sky ----------
   const tip = $('#tip');
   let idle = performance.now();
-  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .55, cy: mob ? .5 : .54, r: mob ? .38 : .34, lon: -40, lat: 22, spin: 2.4, font: 12,
+  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .56, cy: mob ? .5 : .53, r: mob ? .38 : .36, lon: -40, lat: 22, spin: 2.4, font: 12, lens: true, parallax: !mob, shellLabels: false,
+    onGround: (gp, px, py) => probe(gp, px, py),
     onPick: i => { focus(i, true); stopTour(); },
     onHover: i => { if (i != null) idle = performance.now(); } });
   window.__globe = globe;
@@ -22,7 +23,7 @@
     const list = TOUR.filter(n => CAT.by.has(n)); if (!list.length) return; const s = CAT.by.get(list[tourK++ % list.length]); tourT = now; focus(s.i, true, true); }, 1000);
   const tagsEl = $('#tags'); let filter = null;
   function chips(by) {
-    tagsEl.innerHTML = Object.entries(OB.TAGS).filter(([k]) => by[k]).map(([k, [nm, col]]) => `<button class="chip" data-t="${k}" type="button"><i style="background:${col}"></i>${nm} <span class="dim">${OB.num(by[k])}</span></button>`).join('');
+    tagsEl.innerHTML = Object.entries(OB.TAGS).filter(([k]) => by[k]).map(([k, [nm, col]]) => `<button class="chip" data-t="${k}" type="button" title="${OB.num(by[k])}"><i style="background:${col}"></i>${nm}</button>`).join('');
     tagsEl.querySelectorAll('.chip').forEach(b => b.onclick = () => {
       b.classList.toggle('on'); const on = [...tagsEl.querySelectorAll('.chip.on')].map(x => x.dataset.t); filter = on.length ? new Set(on) : null; globe.filter = filter;
     });
@@ -56,6 +57,20 @@
     $('#unf').onclick = () => { focusI = null; globe.focus = null; card.classList.remove('on'); };
   }
   setInterval(drawCard, 1000);
+
+  // click the planet anywhere: what is above that spot right now
+  function probe(gp, px, py) {
+    const pb = $('#probe'); if (!gp || !POS || !CAT) { globe.probe = null; pb.classList.remove('on'); return; }
+    stopTour(); const here = { lat: gp.lat, lon: gp.lon }, up = [], n = Math.min(CAT.sats.length, POS.length / 4);
+    for (let i = 0; i < n; i++) { const o = i * 4; if (POS[o] !== POS[o]) continue; const l = lookFrom(here, POS[o], POS[o + 1], POS[o + 2]); if (l.el > 30) up.push([l.el, i]); }
+    up.sort((a, b) => b[0] - a[0]); globe.probe = { lat: gp.lat, lon: gp.lon, list: up.slice(0, 60).map(u => u[1]) };
+    const named = up.filter(([, i]) => CAT.sats[i].tag !== 'starlink').slice(0, 5).concat(up.filter(([, i]) => CAT.sats[i].tag === 'starlink').slice(0, 1));
+    pb.innerHTML = `<button class="x" type="button">×</button><b>${OB.ll(gp.lat, gp.lon)}</b><small>${OB.num(up.length)} satellites more than 30° up from here, right now</small>` + named.map(([el, i]) => `<a data-i="${i}"><span style="color:var(--ink)">${esc(CAT.sats[i].name)}</span><span>${Math.round(el)}°</span></a>`).join('');
+    const sky = $('#sky'), W = sky.clientWidth, H = sky.clientHeight; pb.style.left = Math.min(W - 290, px + 18) + 'px'; pb.style.top = Math.min(H - 260, Math.max(10, py - 20)) + 'px'; pb.classList.add('on');
+    pb.querySelector('.x').onclick = () => { globe.probe = null; pb.classList.remove('on'); };
+    pb.querySelectorAll('a').forEach(a => a.onclick = () => { focus(+a.dataset.i, true); pb.classList.remove('on'); globe.probe = null; });
+  }
+  addEventListener('keydown', e => { if (e.key === 'Escape') { globe.probe = null; $('#probe').classList.remove('on'); } });
 
   // ---------- data ----------
   async function boot() {

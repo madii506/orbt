@@ -32,14 +32,20 @@
         const nl = drag.lon - dx * k, nt = Math.max(-70, Math.min(70, drag.lat + dy * k)); const now = performance.now(); if (last) { vx = (nl - this.lon0) / Math.max(8, now - last) * 1000; vy = 0; } last = now;
         this.lon0 = nl; this.lat0 = nt;
       });
-      const up = e => { if (drag && drag.moved < 5) { (this.rip || (this.rip = [])).push({ x: this.mx, y: this.my, t: performance.now() }); if (this.hover != null && this.o.onPick) this.o.onPick(this.hover); } if (drag && drag.moved >= 5) this.inertia = Math.max(-60, Math.min(60, vx)); drag = null; last = 0; c.classList.remove('drag'); this.held = false; };
+      const up = e => { if (drag && drag.moved < 5) { (this.rip || (this.rip = [])).push({ x: this.mx, y: this.my, t: performance.now() }); if (this.hover != null && this.o.onPick) this.o.onPick(this.hover); else { const gp = this.ground(this.mx, this.my); if (gp && this.o.onGround) this.o.onGround(gp, this.mx, this.my); else if (this.o.onGround) this.o.onGround(null); } } if (drag && drag.moved >= 5) this.inertia = Math.max(-60, Math.min(60, vx)); drag = null; last = 0; c.classList.remove('drag'); this.held = false; };
       c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+      c.addEventListener('dblclick', e => { const b = c.getBoundingClientRect(), gp = this.ground(e.clientX - b.left, e.clientY - b.top); if (gp) { this.lookAt(gp.lat, gp.lon, 900); this.setZoom(Math.min(2.6, (this.zt || this.zoom) * 1.5)); } });
       c.addEventListener('pointerleave', () => { this.mx = null; this.hover = null; if (this.o.onHover) this.o.onHover(null); });
     }
     // the view: where the camera looks
     proj(lat, lon, r) {
-      const la = lat * D, dl = (lon - this.lon0) * D, l0 = this.lat0 * D, cl = Math.cos(la);
+      const la = lat * D, dl = (lon - this.lon0 - (this.plon || 0)) * D, l0 = (this.lat0 + (this.plat || 0)) * D, cl = Math.cos(la);
       return [r * cl * Math.sin(dl), r * (Math.cos(l0) * Math.sin(la) - Math.sin(l0) * cl * Math.cos(dl)), r * (Math.sin(l0) * Math.sin(la) + Math.cos(l0) * cl * Math.cos(dl))];
+    }
+    ground(px, py) {
+      const xx = (px - this.X) / this.R, yy = -(py - this.Y) / this.R, rr = xx * xx + yy * yy; if (rr > 1) return null;
+      const z = Math.sqrt(1 - rr), l0 = (this.lat0 + (this.plat || 0)) * D, s0 = Math.sin(l0), c0 = Math.cos(l0);
+      return { lat: Math.asin(z * s0 + yy * c0) / D, lon: ((this.lon0 + (this.plon || 0) + Math.atan2(xx, z * c0 - yy * s0) / D) + 540) % 360 - 180 };
     }
     lookAt(lat, lon, ms = 1400) { const f = { lon: this.lon0, lat: this.lat0 }, t0 = performance.now(); let dl = ((lon - f.lon + 540) % 360) - 180; this.anim = { f, t0, ms, dl, dt: Math.max(-60, Math.min(60, lat)) - f.lat }; }
     loop(t) {
@@ -47,6 +53,7 @@
       if (t - this.drawn < 1000 / this.fps - 2) return; const dt = this.lt ? Math.min(.1, (t - this.lt) / 1000) : 0; this.lt = t; this.drawn = t;
       if (this.anim) { const k = Math.min(1, (t - this.anim.t0) / this.anim.ms), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; this.lon0 = this.anim.f.lon + this.anim.dl * e; this.lat0 = this.anim.f.lat + this.anim.dt * e; if (k >= 1) this.anim = null; }
       else if (!this.held) { if (this.inertia) { this.lon0 -= this.inertia * dt; this.inertia *= Math.pow(.05, dt); if (Math.abs(this.inertia) < .2) this.inertia = 0; } if (!OB.RM && !this.focusLock) this.lon0 += this.spin * dt; }
+      if (this.o.parallax) { const on = !this.held && this.mx != null && !this.anim, tp = on ? -((this.my / this.h) - .5) * 9 : 0, tl = on ? ((this.mx / this.w) - .5) * 14 : 0; this.plat = (this.plat || 0) + (tp - (this.plat || 0)) * Math.min(1, dt * 2.5); this.plon = (this.plon || 0) + (tl - (this.plon || 0)) * Math.min(1, dt * 2.5); }
       if (this.zt != null && Math.abs(this.zt - this.zoom) > .002) { this.zoom += (this.zt - this.zoom) * Math.min(1, dt * 6); this.R = this.R0 * this.zoom; }
       this.draw(t);
     }
@@ -57,13 +64,16 @@
       x.fillStyle = 'rgba(246,243,236,.86)'; x.beginPath(); x.arc(X, Y, R, 0, Math.PI * 2); x.fill();
       const groups = this.landGroups(now, sv);
       x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `${this.f}px JBM, monospace`;
-      for (const k in groups) { const G = groups[k]; x.fillStyle = G.col; const p = G.p; for (let n = 0; n < p.length; n += 2) x.fillText(G.g, p[n], p[n + 1]); }
+      const lx = this.o.lens && this.mx != null && !this.held ? this.mx : -9999, ly = this.my, LR = 120, near = [];
+      for (const k in groups) { const G = groups[k]; x.fillStyle = G.col; const p = G.p; for (let n = 0; n < p.length; n += 2) { const dx = p[n] - lx, dy = p[n + 1] - ly; if (dx * dx + dy * dy < LR * LR) { near.push(G.g, p[n], p[n + 1], dx, dy); continue; } x.fillText(G.g, p[n], p[n + 1]); } }
+      for (let n = 0; n < near.length; n += 5) { const dx = near[n + 3], dy = near[n + 4], d = Math.sqrt(dx * dx + dy * dy), f = 1 - d / LR; x.font = `${(this.f * (1 + f * .9)).toFixed(1)}px JBM, monospace`; x.fillStyle = `rgba(40,110,214,${.35 + f * .6})`; x.fillText(near[n], near[n + 1] + dx / (d || 1) * f * 12, near[n + 2] + dy / (d || 1) * f * 12); }
+      x.font = `${this.f}px JBM, monospace`;
       x.strokeStyle = 'rgba(29,57,52,.5)'; x.lineWidth = 1; x.beginPath(); x.arc(X, Y, R, 0, Math.PI * 2); x.stroke();
       if (this.o.shells !== false) {
         // the altitude shells: low orbit, the navigation satellites, the geostationary ring
         x.setLineDash([2, 6]); x.font = `${Math.max(9, this.f - 2)}px JBM, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
         [[2000, 'LEO < 2,000 km'], [20200, 'MEO · GPS 20,200 km'], [35786, 'GEO 35,786 km']].forEach(([a, lb], k) => { const r = altR(a) * R; x.strokeStyle = `rgba(29,57,52,${.13 - k * .02})`; x.beginPath(); x.arc(X, Y, r, 0, Math.PI * 2); x.stroke();
-          const an = -Math.PI / 2 - .32 - k * .06; x.fillStyle = 'rgba(29,57,52,.45)'; x.fillText(lb, X + Math.cos(an) * r + 6, Y + Math.sin(an) * r); });
+          const an = -Math.PI / 2 - .32 - k * .06; if (this.o.shellLabels !== false) { x.fillStyle = 'rgba(29,57,52,.45)'; x.fillText(lb, X + Math.cos(an) * r + 6, Y + Math.sin(an) * r); } });
         x.setLineDash([]);
         // a bezel of degree ticks that turns with the view
         const br = R * 1.12, rot = -this.lon0 * D; x.strokeStyle = 'rgba(29,57,52,.22)';
@@ -101,8 +111,18 @@
         if (this.tags && this.tags.size) { x.font = `700 ${Math.max(10, this.f - 1)}px JBM, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
           for (const [ti, lab] of this.tags) { const o = ti * 4; if (!(P[o] === P[o])) continue; const p = this.proj(P[o], P[o + 1], altR(P[o + 2])); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue; const sx = X + p[0] * R, sy = Y - p[1] * R;
             x.strokeStyle = 'rgba(40,110,214,.8)'; x.beginPath(); x.arc(sx, sy, 4, 0, Math.PI * 2); x.stroke(); x.fillStyle = '#286ed6'; x.fillText(lab, sx + 7, sy - 7); } }
+        if (this.hover != null && this.hover !== this.focus) {
+          const hs0 = S[this.hover]; if (!this.hoverTrack || this.hoverTrack.k !== hs0.norad) { const r = OB.rec(hs0), per = Math.min(ORB.periodMin(r), 1440), pts = [], n0 = new Date(); for (let m = 0; m <= per; m += per / 90) { const p = ORB.at(r, new Date(n0.getTime() + m * 6e4)); if (p) pts.push([p.lat, p.lon, p.alt]); } this.hoverTrack = { k: hs0.norad, pts }; }
+          for (const [la, lo, al] of this.hoverTrack.pts) { const p = this.proj(la, lo, altR(al)); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue; x.fillStyle = 'rgba(40,110,214,.55)'; x.fillRect(X + p[0] * R - 1, Y - p[1] * R - 1, 2, 2); }
+        }
         if (this.hover != null && this.hover !== this.focus) { const hs = S[this.hover]; x.strokeStyle = OB.TAGS[hs.tag][1]; x.lineWidth = 1.5; x.beginPath(); x.arc(this.hx, this.hy, 7, 0, Math.PI * 2); x.stroke(); x.lineWidth = 1;
           x.font = `700 ${this.f}px JBM, monospace`; x.textAlign = 'left'; const lb = hs.name + '  ' + hs.norad, tw = x.measureText(lb).width; x.fillStyle = 'rgba(246,243,236,.92)'; x.fillRect(this.hx + 11, this.hy - 9, tw + 10, 18); x.fillStyle = '#1d3934'; x.fillText(lb, this.hx + 16, this.hy); }
+        if (this.probe) { const pr = this.probe, g0 = this.proj(pr.lat, pr.lon, 1);
+          if (g0[2] > 0) { const gx = X + g0[0] * R, gy = Y - g0[1] * R, pu = (performance.now() / 1200) % 1;
+            x.strokeStyle = 'rgba(194,71,14,.9)'; x.lineWidth = 1.5; x.beginPath(); x.arc(gx, gy, 5, 0, Math.PI * 2); x.stroke(); x.globalAlpha = 1 - pu; x.beginPath(); x.arc(gx, gy, 5 + pu * 26, 0, Math.PI * 2); x.stroke(); x.globalAlpha = 1; x.lineWidth = 1;
+            x.setLineDash([2, 4]); x.strokeStyle = 'rgba(194,71,14,.55)';
+            for (const i of pr.list) { const o = i * 4; if (!(P[o] === P[o])) continue; const p = this.proj(P[o], P[o + 1], altR(P[o + 2])); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue; x.beginPath(); x.moveTo(gx, gy); x.lineTo(X + p[0] * R, Y - p[1] * R); x.stroke(); }
+            x.setLineDash([]); } }
         // the focused satellite: its orbit ahead and behind, and its glyph
         if (this.focus != null && S[this.focus]) this.drawFocus(S[this.focus], now);
       }
@@ -114,7 +134,7 @@
     landGroups(now, sv) {
       const R = this.R, X = this.X, Y = this.Y, cw = this.cw, ch = this.ch;
       if (!sv) { const ss = ORB.subsolar(now || new Date()); sv = this.proj(ss.lat, ss.lon, 1); }
-      const l0 = this.lat0 * D, s0 = Math.sin(l0), c0 = Math.cos(l0);
+      const l0 = (this.lat0 + (this.plat || 0)) * D, s0 = Math.sin(l0), c0 = Math.cos(l0), lonC = this.lon0 + (this.plon || 0);
       const cols = Math.ceil(2 * R / cw) + 2, rows = Math.ceil(2 * R / ch) + 2, x0 = X - (cols / 2) * cw, y0 = Y - (rows / 2) * ch;
       const groups = {};
       const put = (g, col, px, py) => { const k = g + col; (groups[k] || (groups[k] = { g, col, p: [] })).p.push(px, py); };
@@ -123,7 +143,7 @@
         for (let i = 0; i < cols; i++) {
           const px = x0 + (i + .5) * cw, xx = (px - X) / R, rr = xx * xx + yy * yy; if (rr > 1) continue;
           const z = Math.sqrt(1 - rr);
-          const lat = Math.asin(z * s0 + yy * c0) / D, lon = this.lon0 + Math.atan2(xx, z * c0 - yy * s0) / D;
+          const lat = Math.asin(z * s0 + yy * c0) / D, lon = lonC + Math.atan2(xx, z * c0 - yy * s0) / D;
           const day = xx * sv[0] + yy * sv[1] + z * sv[2];   // >0 in sunlight
           const land = LAND.at(lat, ((lon + 540) % 360) - 180);
           const edge = rr > .955;
