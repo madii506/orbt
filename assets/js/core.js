@@ -71,24 +71,54 @@
     } catch (e) { const n = O.$('#nobj'); if (n) n.textContent = 'offline'; }
   };
 
-  // ---------- the ambient background: faint orbits drifting behind everything ----------
+  // ---------- the living background: a dot grid that wakes up under the pointer, orbits that carry real satellites,
+  //            passes that cross the page with their real names, warp streaks when you scroll fast ----------
   O.ambient = () => {
     const c = O.$('#amb'); if (!c) return; const x = c.getContext('2d'); let w, h, d;
     const fit = () => { d = Math.min(2, devicePixelRatio || 1); w = innerWidth; h = innerHeight; c.width = w * d; c.height = h * d; x.setTransform(d, 0, 0, d, 0, 0); };
     fit(); addEventListener('resize', fit);
-    const orbits = [{ cx: .82, cy: .2, rx: .55, ry: .12, rot: -.22, n: 3, v: .05 }, { cx: .1, cy: .85, rx: .4, ry: .1, rot: .3, n: 2, v: .07 }, { cx: .55, cy: .62, rx: .9, ry: .16, rot: -.08, n: 4, v: .03 }];
-    let sy = 0; addEventListener('scroll', () => { sy = scrollY; }, { passive: true });
+    let mx = -999, my = -999, sy = scrollY, vy = 0, lastSy = scrollY; const rip = [];
+    addEventListener('pointermove', e => { mx = e.clientX; my = e.clientY; }, { passive: true });
+    addEventListener('pointerdown', e => { rip.push({ x: e.clientX, y: e.clientY, t: performance.now() }); if (rip.length > 6) rip.shift(); }, { passive: true });
+    addEventListener('scroll', () => { sy = scrollY; }, { passive: true });
+    let names = ['ISS (ZARYA)', 'HST', 'NOAA 19', 'TIANHE', 'LANDSAT 9', 'GOES 16', 'SENTINEL-2A', 'TERRA', 'AQUA', 'METOP-C'];
+    O.catalog().then(cat => { const pick = cat.sats.filter(s => s.tag !== 'starlink' && s.tag !== 'other'); if (pick.length > 20) names = Array.from({ length: 40 }, () => pick[(Math.random() * pick.length) | 0]).map(s => s.name + ' · ' + s.norad); }).catch(() => {});
+    const orbits = [{ cx: .82, cy: .2, rx: .62, ry: .13, rot: -.22, n: 3, v: .045 }, { cx: .08, cy: .86, rx: .45, ry: .11, rot: .3, n: 2, v: .06 }, { cx: .55, cy: .6, rx: .95, ry: .17, rot: -.08, n: 4, v: .028 }, { cx: .3, cy: .3, rx: .7, ry: .09, rot: .15, n: 2, v: -.035 }];
+    orbits.forEach((o, k) => o.lab = Array.from({ length: o.n }, (_, i) => (k * 7 + i * 3) % 10));
+    const passes = []; let nextPass = performance.now() + 1500;
+    const G = 32;
     const draw = t => {
       requestAnimationFrame(draw); if (document.hidden) return; const k = t / 1000; x.clearRect(0, 0, w, h);
+      vy += ((sy - lastSy) - vy) * .2; lastSy = sy; const warp = Math.min(1, Math.abs(vy) / 60);
+      // the grid: drifts with the scroll, wakes up near the pointer, ripples where you click
+      const oy = -(sy * .25) % G, ox = (k * 2) % G;
+      for (let yy = oy - G; yy < h + G; yy += G) for (let xx = ox - G; xx < w + G; xx += G) {
+        let px = xx, py = yy, a = .5, s = 1.4, col = 'rgba(208,200,185,';
+        const dx = px - mx, dy = py - my, dd = Math.sqrt(dx * dx + dy * dy);
+        if (dd < 170) { const f = 1 - dd / 170; px += dx / (dd || 1) * f * 10; py += dy / (dd || 1) * f * 10; s = 1.4 + f * 2.6; col = 'rgba(40,110,214,'; a = .25 + f * .7; }
+        for (const r of rip) { const age = (t - r.t) / 1000; if (age > 1.6) continue; const rd = Math.hypot(xx - r.x, yy - r.y), wave = Math.abs(rd - age * 520); if (wave < 40) { const f = (1 - wave / 40) * (1 - age / 1.6); s += f * 3; col = 'rgba(40,110,214,'; a = Math.max(a, f); py -= f * 6; } }
+        x.fillStyle = col + a + ')';
+        if (warp > .05) x.fillRect(px - .6, py - warp * 14, 1.2, warp * 28 + s); else x.fillRect(px - s / 2, py - s / 2, s, s);
+      }
+      // orbits with satellites on them
+      x.font = '10.5px JBM, monospace';
       for (const o of orbits) {
-        const cx = o.cx * w, cy = o.cy * h - (sy * .05) % h, rx = o.rx * w, ry = o.ry * h;
-        x.save(); x.translate(cx, cy); x.rotate(o.rot);
-        x.strokeStyle = 'rgba(29,57,52,.07)'; x.setLineDash([2, 7]); x.lineWidth = 1; x.beginPath(); x.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
-        for (let i = 0; i < o.n; i++) { const a = k * o.v * (RM ? 0 : 1) + i * Math.PI * 2 / o.n, px = Math.cos(a) * rx, py = Math.sin(a) * ry;
-          for (let j = 1; j < 14; j++) { const b = a - j * .012, qx = Math.cos(b) * rx, qy = Math.sin(b) * ry; x.fillStyle = `rgba(40,110,214,${.22 * (1 - j / 14)})`; x.fillRect(qx - 1, qy - 1, 2, 2); }
-          x.fillStyle = 'rgba(29,57,52,.45)'; x.font = '11px JBM, monospace'; x.fillText('=[]=', px - 13, py + 4); }
+        const cx = o.cx * w, cy = o.cy * h - (sy * .06) % (h * .3), rx = o.rx * w, ry = o.ry * h;
+        x.save(); x.translate(cx, cy); x.rotate(o.rot + Math.sin(k * .05) * .02);
+        x.strokeStyle = 'rgba(29,57,52,.075)'; x.setLineDash([2, 8]); x.lineWidth = 1; x.beginPath(); x.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
+        for (let i = 0; i < o.n; i++) { const an = k * o.v * (RM ? 0 : 1) + i * Math.PI * 2 / o.n, px = Math.cos(an) * rx, py = Math.sin(an) * ry;
+          for (let j = 1; j < 22; j++) { const b = an - j * .01 * Math.sign(o.v), qx = Math.cos(b) * rx, qy = Math.sin(b) * ry; x.fillStyle = `rgba(40,110,214,${.3 * (1 - j / 22)})`; x.fillRect(qx - 1, qy - 1, 2, 2); }
+          x.rotate(-(o.rot)); const gx = px * Math.cos(o.rot) - py * Math.sin(o.rot), gy = px * Math.sin(o.rot) + py * Math.cos(o.rot); x.rotate(o.rot);
+          x.fillStyle = 'rgba(29,57,52,.5)'; x.fillText('=[]=', px - 13, py + 4);
+          x.save(); x.rotate(-o.rot); x.fillStyle = 'rgba(29,57,52,.3)'; x.fillText(String(names[o.lab[i] % names.length]).slice(0, 26), gx + 18, gy - 8); x.restore(); }
         x.restore();
       }
+      // a pass: a real satellite name crossing the page every few seconds
+      if (t > nextPass && !RM) { const L2R = Math.random() < .5, y0 = h * (.15 + Math.random() * .7); passes.push({ t0: t, dur: 9000 + Math.random() * 5000, y0, y1: y0 + (Math.random() - .5) * h * .4, L2R, nm: names[(Math.random() * names.length) | 0] }); nextPass = t + 5000 + Math.random() * 4000; }
+      for (let i = passes.length - 1; i >= 0; i--) { const p = passes[i], f = (t - p.t0) / p.dur; if (f > 1) { passes.splice(i, 1); continue; }
+        const X = (p.L2R ? -60 + f * (w + 120) : w + 60 - f * (w + 120)), Y = p.y0 + (p.y1 - p.y0) * f + Math.sin(f * Math.PI) * -40;
+        for (let j = 1; j < 30; j++) { const g2 = f - j * .004; if (g2 < 0) break; const tx = (p.L2R ? -60 + g2 * (w + 120) : w + 60 - g2 * (w + 120)), ty = p.y0 + (p.y1 - p.y0) * g2 + Math.sin(g2 * Math.PI) * -40; x.fillStyle = `rgba(40,110,214,${.4 * (1 - j / 30)})`; x.fillRect(tx - 1, ty - 1, 2, 2); }
+        x.fillStyle = 'rgba(29,57,52,.55)'; x.font = '700 11px JBM, monospace'; x.fillText('=[]=', X - 13, Y + 4); x.font = '10.5px JBM, monospace'; x.fillStyle = 'rgba(29,57,52,.35)'; x.fillText(p.nm, X + 18, Y - 8); }
     };
     requestAnimationFrame(draw);
   };

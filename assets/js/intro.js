@@ -1,16 +1,17 @@
-/* orbt intro, ~7 s, once per tab. Click, scroll or any key skips.
+/* orbt intro, 5 s, on every visit to the home page. Move the pointer through the swarm and it scatters; click the
+   planet to launch a satellite from that spot. Scroll, any key or the skip button goes straight in.
    A line powers on, a swarm of glyphs flies in and assembles the real planet (today's coastlines and day/night),
    every satellite lifts off the surface to its own altitude, an orbit draws itself around it, the wordmark decodes
    out of noise, and the planet glides into place under the page: the live globe takes over from the same cells. */
 (() => {
   const el = document.getElementById('intro'), html = document.documentElement; if (!el) return;
-  const q = new URLSearchParams(location.search); let seen = false; try { seen = sessionStorage.getItem('orbt_intro') === '1'; } catch (e) {}
+  const q = new URLSearchParams(location.search), seen = false;
   const finish = () => { html.classList.remove('booting'); html.classList.add('booted'); document.body.classList.remove('lock'); window.dispatchEvent(new Event('orbt:enter')); };
   if ((seen && !q.has('intro')) || q.has('skip') || OB.RM) { el.remove(); finish(); return; }
   html.classList.add('booting'); document.body.classList.add('lock');
   const cv = el.querySelector('canvas'), g = cv.getContext('2d'), bar = el.querySelector('.bbar i');
   const DPR = Math.min(2, devicePixelRatio || 1);
-  const TL = { power: .7, spawn0: .35, spawn1: 2.0, fly: 1.05, rise0: 2.3, rise1: 3.6, ring0: 3.4, ring1: 4.6, word: 4.2, hand0: 5.5, hand1: 6.6, END: 7.0 };
+  const TL = { power: .5, spawn0: .15, spawn1: 1.3, fly: .85, rise0: 1.5, rise1: 2.6, ring0: 2.2, ring1: 3.2, word: 2.6, hand0: 3.9, hand1: 4.8, END: 5.0 };
   const cl = x => Math.min(1, Math.max(0, x)), eo = x => 1 - Math.pow(1 - cl(x), 3), io = x => { x = cl(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
   const back = x => { x = cl(x); const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
   const rnd = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
@@ -25,6 +26,10 @@
   }
   const glyph = (ch, col, x, y, a = 1, sc = 1, wt = 400, fs = F) => { if (a <= .01 || sc <= .01) return; const s = sprite(ch, col, wt, fs), z = s.box * sc; g.globalAlpha = Math.min(1, a); g.drawImage(s, x - z / 2, y - z / 2, z, z); };
   let P = [], SATS = [], globe = null, view = null, t0 = 0, done = false, skipping = false;
+  let mx = -9999, my = -9999, launches = [], sparks = [];
+  el.addEventListener('pointermove', e => { mx = e.clientX; my = e.clientY; });
+  el.addEventListener('pointerleave', () => { mx = my = -9999; });
+  el.addEventListener('pointerdown', e => { if (e.target.closest('.bskip')) return; launches.push({ x: e.clientX, y: e.clientY, t: performance.now(), a: Math.atan2(e.clientY - H * .56, e.clientX - W / 2) }); });
   function layout() { W = innerWidth; H = innerHeight; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); g.setTransform(DPR, 0, 0, DPR, 0, 0); }
   // the planet's cells, exactly as the live globe will draw them; shown scaled about the screen centre until the hand-off
   function build() {
@@ -47,6 +52,7 @@
     SATS = out;
   }
   const map = (x, y, k) => { const s = 1 + (view.s - 1) * (1 - k), cx = globe.X + (view.cx - globe.X) * (1 - k), cy = globe.Y + (view.cy - globe.Y) * (1 - k); return [cx + (x - globe.X) * s, cy + (y - globe.Y) * s, s]; };
+  let j0 = 0;
   function frame(now) {
     if (done) return; requestAnimationFrame(frame);
     const t = (now - t0) / 1000; g.clearRect(0, 0, W, H);
@@ -60,8 +66,19 @@
       const [tx, ty, sc] = map(p.x, p.y, hk); let x = tx, y = ty, ch = p.ch, a = p.al;
       if (k < 1) { const sx = p.sx * W, sy = p.sy * H + Math.sin(t * 3 + p.w) * 6, dx = sx - tx, dy = sy - ty, sw = (1 - k) * 1.4 * p.dir, cs = Math.cos(sw), sn = Math.sin(sw);
         x = tx + (dx * cs - dy * sn) * (1 - k); y = ty + (dx * sn + dy * cs) * (1 - k); if (k < .8 && Math.random() < .35) ch = NOISE[(Math.random() * NOISE.length) | 0]; a = Math.max(.25, p.al) * (.4 + .6 * k); }
-      glyph(ch, p.col, x, y, a, sc * Math.min(1, pop), 400, F);
+      // the pointer pushes the swarm aside; it springs back
+      const ddx = x - mx, ddy = y - my, d2 = ddx * ddx + ddy * ddy;
+      if (d2 < 120 * 120) { const d = Math.sqrt(d2) || 1, f = (1 - d / 120) * 26; x += ddx / d * f; y += ddy / d * f; if (d < 40) { ch = NOISE[(j0++ % NOISE.length)]; a = Math.max(a, .9); } }
+      glyph(ch, d2 < 60 * 60 ? '#286ed6' : p.col, x, y, a, sc * Math.min(1, pop), 400, F);
     }
+    // a click launches a satellite from that spot: a rocket trail curving up and away
+    const pn = performance.now();
+    launches = launches.filter(L => pn - L.t < 1400);
+    for (const L of launches) { const k = (pn - L.t) / 1400, e = eo(k), dist = 60 + e * 260, cur = L.a - .9 * e;
+      const x = L.x + Math.cos(cur) * dist * .9 - Math.cos(L.a) * 60 * .9, y = L.y + Math.sin(cur) * dist * .9 - Math.sin(L.a) * 60 * .9 - e * 40;
+      for (let i = 0; i < 3; i++) sparks.push({ x, y, vx: (Math.random() - .5) * 40, vy: (Math.random() - .5) * 40, life: 1, c: '*+.'[(Math.random() * 3) | 0] });
+      glyph('=[]=', '#1d3934', x, y, 1 - k * .3, 1, 800, 15); }
+    sparks = sparks.filter(s => (s.life -= .03) > 0); for (const s of sparks) { s.x += s.vx * .016; s.y += s.vy * .016; glyph(s.c, s.life > .5 ? '#c2470e' : '#966000', s.x, s.y, s.life, 1, 700, 12); }
     g.globalAlpha = 1;
     const lk = eo((t - 1.4) / 1.2); if (lk > 0) { const [cx, cy, sc] = map(globe.X, globe.Y, hk); g.strokeStyle = 'rgba(29,57,52,.5)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, globe.R * sc, -Math.PI / 2, -Math.PI / 2 + lk * Math.PI * 2); g.stroke(); }
     // satellites lift off to their orbits
@@ -85,10 +102,10 @@
     if (t >= TL.hand1 - .3 && !el.classList.contains('out')) { el.classList.add('out'); finish(); }
     if (t >= TL.END) end();
   }
-  function end() { if (done) return; done = true; try { sessionStorage.setItem('orbt_intro', '1'); } catch (e) {} if (globe) globe.paused = false; if (!el.classList.contains('out')) { el.classList.add('out'); finish(); } setTimeout(() => el.remove(), 900); }
+  function end() { if (done) return; done = true; if (globe) globe.paused = false; if (!el.classList.contains('out')) { el.classList.add('out'); finish(); } setTimeout(() => el.remove(), 900); }
   const skip = () => { if (skipping || done) return; skipping = true; end(); };
-  addEventListener('keydown', skip, { once: true }); el.addEventListener('pointerdown', skip); addEventListener('wheel', skip, { once: true, passive: true }); addEventListener('touchmove', skip, { once: true, passive: true });
+  addEventListener('keydown', skip, { once: true }); el.querySelector('.bskip').addEventListener('click', skip); addEventListener('wheel', skip, { once: true, passive: true });
   layout(); addEventListener('resize', () => { layout(); if (globe) build(); });
   // wait for the font (so the cells line up with the live globe) and briefly for the catalogue, then go
-  Promise.race([Promise.all([document.fonts ? document.fonts.ready : null, OB.catalog().catch(() => null)]), new Promise(r => setTimeout(r, 2500))]).then(() => { setTimeout(() => { t0 = performance.now(); requestAnimationFrame(frame); }, 120); });
+  Promise.race([document.fonts ? document.fonts.ready : Promise.resolve(), new Promise(r => setTimeout(r, 700))]).then(() => { t0 = performance.now(); requestAnimationFrame(frame); });
 })();
