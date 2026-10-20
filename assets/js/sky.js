@@ -59,7 +59,7 @@
     }
     draw(t) {
       const x = this.x, w = this.w, h = this.h, R = this.R, X = this.X, Y = this.Y, cw = this.cw, ch = this.ch; x.clearRect(0, 0, w, h);
-      const now = new Date(), ss = ORB.subsolar(now), sv = this.proj(ss.lat, ss.lon, 1);
+      const now = new Date(clk()), ss = ORB.subsolar(now), sv = this.proj(ss.lat, ss.lon, 1);
       // the disk
       x.fillStyle = 'rgba(246,243,236,.86)'; x.beginPath(); x.arc(X, Y, R, 0, Math.PI * 2); x.fill();
       const groups = this.landGroups(now, sv);
@@ -69,7 +69,7 @@
       for (let n = 0; n < near.length; n += 5) { const dx = near[n + 3], dy = near[n + 4], d = Math.sqrt(dx * dx + dy * dy), f = 1 - d / LR; x.font = `${(this.f * (1 + f * .9)).toFixed(1)}px JBM, monospace`; x.fillStyle = `rgba(40,110,214,${.35 + f * .6})`; x.fillText(near[n], near[n + 1] + dx / (d || 1) * f * 12, near[n + 2] + dy / (d || 1) * f * 12); }
       x.font = `${this.f}px JBM, monospace`;
       x.strokeStyle = 'rgba(29,57,52,.5)'; x.lineWidth = 1; x.beginPath(); x.arc(X, Y, R, 0, Math.PI * 2); x.stroke();
-      if (this.o.shells !== false) {
+      if (this.o.shells !== false && this.rings !== false) {
         // the altitude shells: low orbit, the navigation satellites, the geostationary ring
         x.setLineDash([2, 6]); x.font = `${Math.max(9, this.f - 2)}px JBM, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
         [[2000, 'LEO < 2,000 km'], [20200, 'MEO · GPS 20,200 km'], [35786, 'GEO 35,786 km']].forEach(([a, lb], k) => { const r = altR(a) * R; x.strokeStyle = `rgba(29,57,52,${.13 - k * .02})`; x.beginPath(); x.arc(X, Y, r, 0, Math.PI * 2); x.stroke();
@@ -97,7 +97,7 @@
           const key = (on ? s.tag : 'off') + (lit ? '' : 'd');
           (cols[key] || (cols[key] = [])).push(sx, sy);
           if (on && mx != null) { const dx = sx - mx, dy = sy - my, d2 = dx * dx + dy * dy; if (d2 < best) { best = d2; this.hover = i; this.hx = sx; this.hy = sy; } }
-          if (s.tag === 'station' && on && this.labels && i !== this.focus && /^(ISS \(ZARYA|CSS \(TIANHE|TIANGONG)/.test(s.name)) shells.push([s, sx, sy]);
+          if (s.tag === 'station' && on && this.labels !== false && i !== this.focus && /^(ISS \(ZARYA|CSS \(TIANHE|TIANGONG)/.test(s.name)) shells.push([s, sx, sy]);
         }
         for (const k in cols) {
           const tag = k.replace(/d$/, ''), dark = k.endsWith('d'), c = tag === 'off' ? 'rgba(29,57,52,.08)' : OB.TAGS[tag][1];
@@ -108,11 +108,11 @@
         x.globalAlpha = 1; x.textAlign = 'left'; x.font = `700 ${Math.max(10, this.f - 1)}px JBM, monospace`;
         const said = new Set(); for (const [s, sx, sy] of shells) { const nm = s.name.replace(/\s*\(.*\)/, ''); if (said.has(nm) || said.size > 5) continue; said.add(nm); x.fillStyle = 'rgba(194,71,14,.9)'; x.fillText(nm, sx + 7, sy - 6); }
         // coins riding their satellites: a ticker label next to each paired satellite
-        if (this.tags && this.tags.size) { x.font = `700 ${Math.max(10, this.f - 1)}px JBM, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
+        if (this.tags && this.tags.size && this.coinTags !== false) { x.font = `700 ${Math.max(10, this.f - 1)}px JBM, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
           for (const [ti, lab] of this.tags) { const o = ti * 4; if (!(P[o] === P[o])) continue; const p = this.proj(P[o], P[o + 1], altR(P[o + 2])); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue; const sx = X + p[0] * R, sy = Y - p[1] * R;
             x.strokeStyle = 'rgba(40,110,214,.8)'; x.beginPath(); x.arc(sx, sy, 4, 0, Math.PI * 2); x.stroke(); x.fillStyle = '#286ed6'; x.fillText(lab, sx + 7, sy - 7); } }
         if (this.hover != null && this.hover !== this.focus) {
-          const hs0 = S[this.hover]; if (!this.hoverTrack || this.hoverTrack.k !== hs0.norad) { const r = OB.rec(hs0), per = Math.min(ORB.periodMin(r), 1440), pts = [], n0 = new Date(); for (let m = 0; m <= per; m += per / 90) { const p = ORB.at(r, new Date(n0.getTime() + m * 6e4)); if (p) pts.push([p.lat, p.lon, p.alt]); } this.hoverTrack = { k: hs0.norad, pts }; }
+          const hs0 = S[this.hover]; if (!this.hoverTrack || this.hoverTrack.k !== hs0.norad || Math.abs(now - this.hoverTrack.at) > 6e4 * this.hoverTrack.per * .05) { const r = OB.rec(hs0), per = Math.min(ORB.periodMin(r), 1440), pts = [], n0 = now; for (let m = 0; m <= per; m += per / 90) { const p = ORB.at(r, new Date(n0.getTime() + m * 6e4)); if (p) pts.push([p.lat, p.lon, p.alt]); } this.hoverTrack = { k: hs0.norad, pts, at: now.getTime(), per }; }
           for (const [la, lo, al] of this.hoverTrack.pts) { const p = this.proj(la, lo, altR(al)); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue; x.fillStyle = 'rgba(40,110,214,.55)'; x.fillRect(X + p[0] * R - 1, Y - p[1] * R - 1, 2, 2); }
         }
         if (this.hover != null && this.hover !== this.focus) { const hs = S[this.hover]; x.strokeStyle = OB.TAGS[hs.tag][1]; x.lineWidth = 1.5; x.beginPath(); x.arc(this.hx, this.hy, 7, 0, Math.PI * 2); x.stroke(); x.lineWidth = 1;
@@ -125,6 +125,7 @@
             x.setLineDash([]); } }
         // the focused satellite: its orbit ahead and behind, and its glyph
         if (this.focus != null && S[this.focus]) this.drawFocus(S[this.focus], now);
+        if (this.o.overlay) this.o.overlay(x, this, now);
       }
       if (this.rip) { const pn = performance.now(); this.rip = this.rip.filter(r => pn - r.t < 700); for (const r of this.rip) { const k = (pn - r.t) / 700; x.strokeStyle = `rgba(40,110,214,${1 - k})`; x.beginPath(); x.arc(r.x, r.y, 4 + k * 34, 0, Math.PI * 2); x.stroke(); } }
       if (this.o.onHover) this.o.onHover(this.hover, this.mx, this.my);
@@ -133,7 +134,7 @@
     // land and sea, one character per cell (also used by the intro to assemble the very same planet)
     landGroups(now, sv) {
       const R = this.R, X = this.X, Y = this.Y, cw = this.cw, ch = this.ch;
-      if (!sv) { const ss = ORB.subsolar(now || new Date()); sv = this.proj(ss.lat, ss.lon, 1); }
+      if (!sv) { const ss = ORB.subsolar(now || new Date(clk())); sv = this.proj(ss.lat, ss.lon, 1); }
       const l0 = (this.lat0 + (this.plat || 0)) * D, s0 = Math.sin(l0), c0 = Math.cos(l0), lonC = this.lon0 + (this.plon || 0);
       const cols = Math.ceil(2 * R / cw) + 2, rows = Math.ceil(2 * R / ch) + 2, x0 = X - (cols / 2) * cw, y0 = Y - (rows / 2) * ch;
       const groups = {};
@@ -158,15 +159,16 @@
     }
     drawFocus(s, now) {
       const x = this.x, R = this.R, X = this.X, Y = this.Y, r = OB.rec(s);
-      if (!this.trail || this.trail.k !== s.norad || now - this.trail.at > 20000) {
-        const per = ORB.periodMin(r), span = Math.min(per, 24 * 60), pts = [];
+      const per0 = ORB.periodMin(r);
+      if (!this.trail || this.trail.k !== s.norad || Math.abs(now - this.trail.at) > Math.max(20000, Math.min(per0, 1440) * 6e4 * .06)) {
+        const per = per0, span = Math.min(per, 24 * 60), pts = [];
         for (let m = -span * .5; m <= span * .5; m += Math.max(.5, span / 240)) { const p = ORB.at(r, new Date(now.getTime() + m * 6e4)); if (p) pts.push([p.lat, p.lon, p.alt, m]); }
         this.trail = { k: s.norad, at: now.getTime(), pts, t0: now.getTime() };
       }
       const sh = (now.getTime() - this.trail.t0) / 6e4;
       for (const [lat, lon, alt, m] of this.trail.pts) {
         const p = this.proj(lat, lon, altR(alt)); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue;
-        const ahead = m - sh > 0; x.fillStyle = ahead ? 'rgba(40,110,214,.85)' : 'rgba(40,110,214,.28)'; x.fillRect(X + p[0] * R - 1, Y - p[1] * R - 1, 2, 2);
+        const ahead = m - sh > 0; if (this.trails === false) continue; x.fillStyle = ahead ? 'rgba(40,110,214,.85)' : 'rgba(40,110,214,.28)'; x.fillRect(X + p[0] * R - 1, Y - p[1] * R - 1, 2, 2);
       }
       const p0 = ORB.at(r, now); if (!p0) return; const p = this.proj(p0.lat, p0.lon, altR(p0.alt));
       const sx = X + p[0] * R, sy = Y - p[1] * R, hidden = p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1;
@@ -176,17 +178,28 @@
       x.textAlign = 'left'; x.font = `700 ${this.f}px JBM, monospace`; x.fillStyle = '#1d3934'; x.fillText(s.name, sx + 26, sy - 12);
     }
   }
-  // the sky engine: one worker, one catalogue, any number of globes
-  let worker = null, ready = null, lastBuf = null; const subs = new Set();
+  // the sky engine: one worker, one catalogue, any number of globes, and one clock that can run live, fast, paused or scrubbed
+  const CLK = { a: Date.now(), s: Date.now(), rate: 1, paused: false }; const csubs = new Set();
+  function clk() { return CLK.paused ? CLK.s : CLK.s + (Date.now() - CLK.a) * CLK.rate; }
+  const isLive = () => !CLK.paused && CLK.rate === 1 && Math.abs(clk() - Date.now()) < 2500;
+  function setClock(o) { const n = clk(); CLK.s = o.t != null ? o.t : n; CLK.a = Date.now(); if (o.rate != null) CLK.rate = o.rate; if (o.paused != null) CLK.paused = o.paused; kick(); csubs.forEach(f => f(clock.state())); }
+  const clock = { now: clk, set: setClock, live: () => setClock({ t: Date.now(), rate: 1, paused: false }), isLive, state: () => ({ t: clk(), rate: CLK.rate, paused: CLK.paused, live: isLive() }), on: f => { csubs.add(f); return () => csubs.delete(f); } };
+  let worker = null, ready = null, lastBuf = null, busy = false, want = false, tmr = 0; const subs = new Set();
+  function tick() { clearTimeout(tmr); if (!worker) return; if (document.hidden) { tmr = setTimeout(tick, 1000); return; } if (busy) { want = true; return; } busy = true; worker.postMessage({ type: 'tick', t: clk() }); }
+  function kick() { if (ready && worker) tick(); }
   function start(sats) {
     if (ready) return ready;
     ready = new Promise(res => {
       worker = new Worker('/assets/js/sky-worker.js');
-      worker.onmessage = e => { if (e.data.type === 'ready') { res(); tick(); setInterval(tick, 1000); } else if (e.data.type === 'pos') { lastBuf = e.data.buf; subs.forEach(f => f(e.data.buf, e.data.t)); } };
+      worker.onmessage = e => {
+        if (e.data.type === 'ready') { res(); tick(); return; }
+        if (e.data.type !== 'pos') return; busy = false; lastBuf = e.data.buf; subs.forEach(f => f(e.data.buf, e.data.t));
+        const fast = !CLK.paused && !isLive(); clearTimeout(tmr); tmr = setTimeout(tick, want ? 0 : fast ? 40 : 1000 - (Date.now() % 1000) + 5); want = false;
+      };
       worker.postMessage({ type: 'init', tle: sats.map(s => [s.l1, s.l2]) });
     });
-    const tick = () => { if (!document.hidden) worker.postMessage({ type: 'tick', t: Date.now() }); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
     return ready;
   }
-  window.SKY = { Globe, start, on: f => { subs.add(f); return () => subs.delete(f); }, altR, last: () => lastBuf };
+  window.SKY = { Globe, start, on: f => { subs.add(f); return () => subs.delete(f); }, altR, last: () => lastBuf, clock };
 })();

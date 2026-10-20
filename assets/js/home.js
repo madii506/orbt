@@ -4,92 +4,232 @@
   let CAT = null, POS = null, globe = null, focusI = null, COINS = { list: [], taken: new Map() };
   const mob = innerWidth < 900;
 
-  // ---------- 01 the sky ----------
-  const tip = $('#tip');
-  let idle = performance.now();
-  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .63, cy: mob ? .5 : .53, r: mob ? .38 : .315, lon: -40, lat: 22, spin: 2.4, font: 12, lens: true, parallax: !mob, shellLabels: false,
+  // ---------- 01 the sky: a ground station you can drive ----------
+  const CLK = SKY.clock, NOW = () => new Date(CLK.now());
+  const hhmmss = t => new Date(t).toISOString().slice(11, 19);
+  const booting = () => document.documentElement.classList.contains('booting');
+  let idle = performance.now(), PINGS = [];
+  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .535, cy: mob ? .5 : .47, r: mob ? .38 : .3, lon: -40, lat: 22, spin: 2.4, font: 12, lens: true, parallax: !mob, shellLabels: false,
     onGround: (gp, px, py) => probe(gp, px, py),
     onPick: i => { focus(i, true); stopTour(); },
-    onHover: i => { if (i != null) idle = performance.now(); } });
+    onHover: i => { if (i != null) idle = performance.now(); },
+    overlay: (x, g) => pings(x, g) });
   window.__globe = globe;
   $('#globe').addEventListener('pointerdown', () => { idle = performance.now(); });
   $('#zIn').onclick = () => globe.setZoom((globe.zt || globe.zoom) * 1.25); $('#zOut').onclick = () => globe.setZoom((globe.zt || globe.zoom) / 1.25);
+
   // the tour: when nobody is touching the globe, it flies from one notable satellite to the next
   const TOUR = [25544, 48274, 20580, 33591, 49260, 43013, 41866, 39084, 27424, 40697, 25994, 28654];
   let tourOn = !mob, tourK = 0, tourT = 0;
-  const stopTour = () => { tourOn = false; $('#zTour').classList.remove('on'); };
-  $('#zTour').onclick = () => { tourOn = !tourOn; $('#zTour').classList.toggle('on', tourOn); tourT = 0; };
+  const stopTour = () => { tourOn = false; $('#zTour').classList.remove('on'); insTour(); };
+  $('#zTour').onclick = () => { tourOn = !tourOn; $('#zTour').classList.toggle('on', tourOn); tourT = 0; idle = 0; insTour(); };
+  const tourList = () => TOUR.filter(n => CAT && CAT.by.has(n));
+  function step(d) { const L = tourList(); if (!L.length) return; const cur = focusI != null ? L.indexOf(CAT.sats[focusI].norad) : -1; tourK = ((cur < 0 ? (d > 0 ? -1 : 0) : cur) + d + L.length) % L.length; focus(CAT.by.get(L[tourK]).i, true); }
   setInterval(() => { if (!tourOn || !CAT || document.hidden) return; const now = performance.now(); if (now - idle < 9000 || now - tourT < 8500) return;
-    const list = TOUR.filter(n => CAT.by.has(n)); if (!list.length) return; const s = CAT.by.get(list[tourK++ % list.length]); tourT = now; focus(s.i, true, true); }, 1000);
-  const tagsEl = $('#tags'); let filter = null;
-  function chips(by) {
-    tagsEl.innerHTML = Object.entries(OB.TAGS).filter(([k]) => by[k]).map(([k, [nm, col]]) => `<button class="chip" data-t="${k}" type="button" title="${OB.num(by[k])}"><i style="background:${col}"></i>${nm}</button>`).join('');
-    tagsEl.querySelectorAll('.chip').forEach(b => b.onclick = () => {
-      b.classList.toggle('on'); const on = [...tagsEl.querySelectorAll('.chip.on')].map(x => x.dataset.t); filter = on.length ? new Set(on) : null; globe.filter = filter;
+    const L = tourList(); if (!L.length) return; const s = CAT.by.get(L[tourK++ % L.length]); tourT = now; focus(s.i, true, true); }, 1000);
+
+  // layers: every group, its live count and how much of it is in sunlight right now
+  const VIEW = { trails: true, labels: true, rings: true, coins: true }; let filter = null;
+  function layers(by) {
+    const rows = Object.entries(by).sort((a, b) => b[1] - a[1]), box = $('#layers');
+    box.innerHTML = rows.map(([k, n]) => `<button type="button" class="ly" data-t="${k}"><i style="background:${OB.TAGS[k][1]}"></i><span class="nm">${OB.TAGS[k][0]}</span><span class="n">${OB.num(n)}</span><span class="lb"><u style="background:${OB.TAGS[k][1]}"></u></span></button>`).join('');
+    box.querySelectorAll('.ly').forEach(b => {
+      b.onclick = () => { b.classList.toggle('on'); applyFilter(); stopTour(); };
+      b.onmouseenter = () => { globe.filter = new Set([b.dataset.t]); };
+      b.onmouseleave = () => { globe.filter = filter; };
     });
   }
-  // search
-  const q = $('#q'), res = $('#res');
-  if (q) q.oninput = () => {
-    const v = q.value.trim().toLowerCase(); if (!v || !CAT) { res.classList.remove('on'); return; }
-    const hits = CAT.sats.filter(s => s.name.toLowerCase().includes(v) || String(s.norad) === v).sort((a, b) => (b.tag === 'station') - (a.tag === 'station') || b.bright - a.bright || a.name.length - b.name.length).slice(0, 12);
-    res.innerHTML = hits.length ? hits.map(s => `<a href="#" data-i="${s.i}">${esc(s.name)}<span>${s.norad}</span></a>`).join('') : '<div class="empty">No active satellite by that name.</div>';
-    res.classList.add('on'); res.querySelectorAll('a').forEach(a => a.onclick = e => { e.preventDefault(); res.classList.remove('on'); q.value = ''; focus(+a.dataset.i, true); });
-  };
-  // the focus card, updated every second from the real orbit
-  const card = $('#card');
+  function applyFilter() { const box = $('#layers'), on = [...box.querySelectorAll('.ly.on')].map(x => x.dataset.t); filter = on.length ? new Set(on) : null; globe.filter = filter; box.classList.toggle('some', !!filter); }
+  function setLayer(t) { $('#layers').querySelectorAll('.ly').forEach(b => b.classList.toggle('on', b.dataset.t === t)); applyFilter(); }
+  $('#views').querySelectorAll('button').forEach(b => b.onclick = () => { const v = b.dataset.v; VIEW[v] = !VIEW[v]; b.classList.toggle('on', VIEW[v]); globe.trails = VIEW.trails; globe.labels = VIEW.labels; globe.rings = VIEW.rings; globe.coinTags = VIEW.coins; });
+
+  // the clock: live, fast-forward, rewind, pause, or drag through the next and last twelve hours
+  const tb = { play: $('#tPlay'), clock: $('#tClock'), st: $('#tState'), live: $('#tLive'), sc: $('#scrub').querySelector('canvas') };
+  const SPAN = 12 * 36e5; let scrubbing = false, shadeK = null, shade = null;
+  function clockUI() {
+    const st = CLK.state(), off = st.t - Date.now(); tb.clock.textContent = hhmmss(st.t);
+    const o = Math.abs(off) < 2500 ? '' : (off > 0 ? '+' : '−') + OB.dur(Math.abs(off));
+    tb.st.textContent = st.live ? 'utc · live' : `utc · ${st.paused ? 'paused' : st.rate === 1 ? '1×' : st.rate === 3600 ? '1h/s' : st.rate + '×'}${o ? ' · ' + o : ''}`;
+    tb.play.textContent = st.paused ? '▶' : '❚❚'; tb.play.setAttribute('aria-label', st.paused ? 'play' : 'pause');
+    tb.live.classList.toggle('on', st.live); $('#tbar').classList.toggle('sim', !st.live);
+    $('#warp').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.w === st.rate && !st.paused));
+    ruler();
+  }
+  function ruler() {
+    const c = tb.sc, d = Math.min(2, devicePixelRatio || 1), W = c.clientWidth, H = c.clientHeight; if (!W) return; if (c.width !== W * d) { c.width = W * d; c.height = H * d; }
+    const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
+    const now = Date.now(), X = t => (t - now + SPAN) / (2 * SPAN) * W, st = CLK.now();
+    // the focused satellite's own night: where in the next and last twelve hours it is in Earth's shadow
+    if (shade) { x.fillStyle = 'rgba(29,57,52,.16)'; for (const [a, b] of shade) x.fillRect(X(a), 4, Math.max(1, X(b) - X(a)), H - 12); }
+    x.strokeStyle = 'rgba(29,57,52,.35)'; x.lineWidth = 1;
+    const h0 = Math.ceil((now - SPAN) / 36e5) * 36e5;
+    for (let t = h0; t <= now + SPAN; t += 36e5) { const px = Math.round(X(t)) + .5, big = new Date(t).getUTCHours() % 6 === 0; x.beginPath(); x.moveTo(px, H - 8); x.lineTo(px, H - (big ? 16 : 11)); x.stroke(); }
+    x.beginPath(); x.moveTo(0, H - 7.5); x.lineTo(W, H - 7.5); x.stroke();
+    x.fillStyle = '#286ed6'; x.fillRect(Math.round(X(now)) - .5, 2, 1, H - 6);
+    const hx = Math.max(3, Math.min(W - 3, X(st))); x.fillStyle = '#1d3934'; x.beginPath(); x.moveTo(hx - 5, 1); x.lineTo(hx + 5, 1); x.lineTo(hx, 8); x.fill(); x.fillRect(hx - .75, 6, 1.5, H - 10);
+  }
+  function shadeFor(s) {
+    if (shadeK === s.norad) return; shadeK = s.norad; shade = null; const r = OB.rec(s), now = Date.now(), out = []; let a = null;
+    for (let t = now - SPAN; t <= now + SPAN; t += 90e3) { const p = ORB.at(r, new Date(t)); if (!p) continue; const lit = ORB.lit(p.eci, new Date(t)); if (!lit && a == null) a = t; if (lit && a != null) { out.push([a, t]); a = null; } }
+    if (a != null) out.push([a, now + SPAN]); shade = out; ruler();
+  }
+  tb.play.onclick = () => { const st = CLK.state(); CLK.set({ paused: !st.paused }); };
+  tb.live.onclick = () => CLK.live();
+  $('#warp').querySelectorAll('button').forEach(b => b.onclick = () => CLK.set({ rate: +b.dataset.w, paused: false }));
+  (() => { const c = tb.sc; let was = false;
+    const at = e => { const b = c.getBoundingClientRect(), k = Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)); CLK.set({ t: Date.now() - SPAN + k * 2 * SPAN }); };
+    c.addEventListener('pointerdown', e => { scrubbing = true; was = CLK.state().paused; CLK.set({ paused: true }); c.setPointerCapture(e.pointerId); at(e); });
+    c.addEventListener('pointermove', e => { if (scrubbing) at(e); });
+    const up = () => { if (!scrubbing) return; scrubbing = false; CLK.set({ paused: was }); }; c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+  })();
+  CLK.on(clockUI); setInterval(clockUI, 250);
+  // the rest of the page is about right now: leaving the sky brings its clock back to live
+  new IntersectionObserver(es => { if (!es[0].isIntersecting && !CLK.isLive()) CLK.live(); }, { threshold: 0 }).observe($('#sky'));
+
+  // keys: space pauses, arrows step through the tour, L goes live, 1-4 set the speed, +/- zoom
+  addEventListener('keydown', e => {
+    if (booting() || e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) return;
+    const r = $('#sky').getBoundingClientRect(); if (r.bottom < 80 || r.top > innerHeight * .6) return;
+    if (e.key === ' ') { e.preventDefault(); tb.play.click(); }
+    else if (e.key === 'ArrowRight') { stopTour(); step(1); } else if (e.key === 'ArrowLeft') { stopTour(); step(-1); }
+    else if (e.key === 'l' || e.key === 'L') CLK.live();
+    else if ('1234'.includes(e.key)) CLK.set({ rate: [1, 60, 600, 3600][+e.key - 1], paused: false });
+    else if (e.key === '+' || e.key === '=') $('#zIn').click(); else if (e.key === '-') $('#zOut').click();
+    else if (e.key === 'Escape') { globe.probe = null; $('#probe').classList.remove('on'); }
+  });
+
+  // the inspector: the focused satellite, recomputed from its real orbit on every tick of the clock
+  const insp = $('#insp'); let IS = null;
   function focus(i, fly, auto) {
     focusI = i; globe.focus = i; const s = CAT.sats[i]; if (!s) return; if (!auto) idle = performance.now();
-    const qk = $('#quick'); if (qk) qk.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.n === s.norad));
-    const p = ORB.at(OB.rec(s), new Date()); if (fly && p) globe.lookAt(p.lat, p.lon);
+    const p = ORB.at(OB.rec(s), NOW()); if (fly && p) globe.lookAt(p.lat, p.lon);
     globe.focusLock = true; clearTimeout(focus._t); focus._t = setTimeout(() => { globe.focusLock = false; }, 9000);
-    if (!auto) { card.classList.add('on'); drawCard(); } else if (!card.classList.contains('on')) card.innerHTML = '';
+    buildInsp(s); shadeFor(s);
   }
-  function drawCard() {
-    if (focusI == null || !CAT || !card.classList.contains('on') && card.innerHTML === '') return; const s = CAT.sats[focusI], r = OB.rec(s), now = new Date(), p = ORB.at(r, now); if (!p) return;
-    const sh = ORB.shape(r), lit = ORB.lit(p.eci, now), nx = ORB.nextOrbit(r, now), coin = COINS.taken.get(s.norad);
-    const ageH = (Date.now() - r.epochMs) / 36e5;
-    card.innerHTML = `<h3>${esc(s.name)}</h3><div class="sub">NORAD ${s.norad} · ${OB.TAGS[s.tag][0]} · elements ${ageH < 48 ? ageH.toFixed(1) + ' h' : Math.round(ageH / 24) + ' d'} old</div>
-      <dl class="kv"><dt>position</dt><dd>${OB.ll(p.lat, p.lon)}</dd><dt>altitude</dt><dd>${OB.num(p.alt)} km</dd><dt>speed</dt><dd>${p.speed.toFixed(2)} km/s</dd>
-      <dt>sun</dt><dd>${lit ? '<span class="acc">in sunlight</span>' : 'in Earth’s shadow'}</dd><dt>orbit</dt><dd>#${OB.num(ORB.orbitNo(r, now))} · ${sh.period.toFixed(1)} min</dd><dt>next lap in</dt><dd>${OB.dur(nx - now)}</dd>
-      <dt>coin</dt><dd>${coin ? `<span class="tag live">$${esc(coin.symbol)} ${coin.state === 'live' ? 'live' : coin.state}</span>` : '<span class="acc">open</span>'}</dd></dl>
-      <div class="acts"><a class="btn s" href="/sat?n=${s.norad}">open its page</a>${coin ? '' : `<a class="btn s o" href="/launch?n=${s.norad}">launch its coin ↗</a>`}<button class="btn s o" type="button" id="unf">×</button></div>`;
-    $('#unf').onclick = () => { focusI = null; globe.focus = null; card.classList.remove('on'); };
+  function insTour() { const t = insp.querySelector('.tr'); if (t) t.classList.toggle('on', tourOn); }
+  function buildInsp(s) {
+    const r = OB.rec(s), sh = ORB.shape(r), ageH = (Date.now() - r.epochMs) / 36e5;
+    IS = { s, r, sh, lap: null, spark: null, cross: null };
+    insp.innerHTML = `<div class="ih"><i style="background:${OB.TAGS[s.tag][1]}"></i><span>${OB.TAGS[s.tag][0]}</span><span class="dim">· ${s.norad}</span><span class="tr${tourOn ? ' on' : ''}"><i class="live"></i>tour</span><span class="nv"><button type="button" data-d="-1" aria-label="previous">‹</button><button type="button" data-d="1" aria-label="next">›</button></span></div>
+      <h3>${esc(s.name)}</h3>
+      <div class="tele"><div><small>altitude</small><b id="iAlt">—</b><u>km</u></div><div><small>speed</small><b id="iSpd">—</b><u>km/s</u></div><div><small>latitude</small><b id="iLat">—</b></div><div><small>longitude</small><b id="iLon">—</b></div></div>
+      <div class="lap"><div class="lt"><span>orbit <b id="iOrb">—</b></span><span id="iNx">—</span></div><div class="lb" id="iLb"></div></div>
+      <div class="spk"><div class="lt"><span>altitude over this orbit</span><span id="iRg"></span></div><div class="sp" id="iSp"></div></div>
+      <dl class="kv"><dt>sun</dt><dd id="iSun">—</dd><dt>below</dt><dd id="iBelow">—</dd><dt>orbit</dt><dd>${OB.num(sh.perigee)}–${OB.num(sh.apogee)} km · ${sh.inc.toFixed(1)}° · ${sh.period < 200 ? sh.period.toFixed(1) + ' min' : (sh.period / 60).toFixed(1) + ' h'}</dd><dt>elements</dt><dd>${ageH < 48 ? ageH.toFixed(1) + ' h' : Math.round(ageH / 24) + ' d'} old</dd><dt>coin</dt><dd id="iCoin">—</dd></dl>
+      <div class="acts" id="iActs"></div>`;
+    insp.querySelectorAll('.nv button').forEach(b => b.onclick = () => { stopTour(); step(+b.dataset.d); });
+    insp.classList.remove('in'); void insp.offsetWidth; insp.classList.add('in');
+    coinInsp(); updInsp();
   }
-  setInterval(drawCard, 1000);
+  function coinInsp() {
+    if (!IS) return; const s = IS.s, coin = COINS.taken.get(s.norad), pairs = (PAIRS || []).filter(p => p.norad === s.norad);
+    $('#iCoin').innerHTML = coin ? `<span class="tag live">$${esc(coin.symbol)} ${coin.state === 'live' ? 'live' : esc(coin.state)}</span>` : '<span class="acc">open</span>';
+    $('#iCoin').innerHTML += pairs.length ? ` <span class="dim">+ ${pairs.length} paired</span>` : '';
+    $('#iActs').innerHTML = `${coin ? '' : `<a class="btn s" href="/launch?n=${s.norad}">launch its coin ↗</a>`}<a class="btn s o" href="#pair" data-pair="${s.norad}">pair a coin</a><a class="btn s o" href="/sat?n=${s.norad}">its page</a>`;
+    const pa = $('#iActs').querySelector('[data-pair]'); pa.onclick = () => { const q = $('#psQ'); if (q) { q.value = String(s.norad); q.dispatchEvent(new Event('input')); } };
+  }
+  function updInsp() {
+    if (!IS) return; const { s, r } = IS, now = NOW(), p = ORB.at(r, now); if (!p) return;
+    $('#iAlt').textContent = OB.num(p.alt); $('#iSpd').textContent = p.speed.toFixed(2);
+    $('#iLat').textContent = Math.abs(p.lat).toFixed(2) + '°' + (p.lat >= 0 ? 'N' : 'S'); $('#iLon').textContent = Math.abs(p.lon).toFixed(2) + '°' + (p.lon >= 0 ? 'E' : 'W');
+    const no = ORB.orbitNo(r, now), ph = ORB.orbitPhase(r, now), nx = ORB.nextOrbit(r, now), per = ORB.periodMin(r);
+    $('#iOrb').textContent = '#' + OB.num(no); $('#iNx').textContent = 'next in ' + OB.dur(nx - now);
+    const W = 34, f = Math.round(ph * W); $('#iLb').innerHTML = '<b>' + '#'.repeat(f) + '</b>' + '.'.repeat(W - f) + ` <span>${Math.round(ph * 100)}%</span>`;
+    // altitude over the whole orbit, from the ascending node to the next; the caret is where it is now
+    if (IS.lap !== no || !IS.spark) { IS.lap = no; const t0 = now.getTime() - ph * per * 6e4, A = []; for (let k = 0; k < 40; k++) { const q = ORB.at(r, new Date(t0 + k / 40 * per * 6e4)); A.push(q ? q.alt : NaN); }
+      const ok = A.filter(v => v === v), lo = Math.min(...ok), hi = Math.max(...ok); IS.spark = { A, lo, hi }; $('#iRg').textContent = `${OB.num(lo)}–${OB.num(hi)} km`; }
+    const { A, lo, hi } = IS.spark, B = '▁▂▃▄▅▆▇█', cur = Math.min(A.length - 1, Math.floor(ph * A.length));
+    $('#iSp').innerHTML = A.map((v, k) => { const c = v === v ? B[Math.max(0, Math.min(7, Math.round((v - lo) / Math.max(1e-6, hi - lo) * 7)))] : ' '; return k === cur ? `<b>${c}</b>` : c; }).join('');
+    // the sun: lit or not, and when that changes next (searched again only once the last answer has passed)
+    const lit = ORB.lit(p.eci, now);
+    if (!IS.cross || IS.cross.lit !== lit || (IS.cross.t && IS.cross.t < now) || Math.abs(now - IS.cross.at) > 6 * 36e5) { const t = ORB.nextCrossing(r, now, !lit, per > 200 ? 30 : 4); IS.cross = { lit, t, at: now.getTime() }; }
+    $('#iSun').innerHTML = (lit ? '<span class="acc">sunlit</span>' : 'in shadow') + (IS.cross.t ? ` <span class="dim">· ${lit ? 'sets' : 'rises'} in ${OB.dur(IS.cross.t - now)}</span>` : '');
+    const ss = ORB.subsolar(now), day = Math.sin(p.lat * D) * Math.sin(ss.lat * D) + Math.cos(p.lat * D) * Math.cos(ss.lat * D) * Math.cos((p.lon - ss.lon) * D) > 0;
+    $('#iBelow').textContent = `${LAND.at(p.lat, p.lon) ? 'land' : 'ocean'} · ${day ? 'day' : 'night'}`;
+  }
 
-  // click the planet anywhere: what is above that spot right now
+  // the event log: real laps, sunrises, sunsets and passes over cities, detected tick by tick from the positions
+  const CITIES = [['Tokyo', 35.68, 139.69], ['New York', 40.71, -74.01], ['London', 51.51, -0.13], ['São Paulo', -23.55, -46.63], ['Sydney', -33.87, 151.21], ['Lagos', 6.52, 3.38], ['Mumbai', 19.08, 72.88], ['Los Angeles', 34.05, -118.24], ['Cairo', 30.04, 31.24], ['Moscow', 55.76, 37.62], ['Singapore', 1.35, 103.82], ['Mexico City', 19.43, -99.13], ['Stockholm', 59.33, 18.07], ['Beijing', 39.9, 116.4], ['Cape Town', -33.92, 18.42], ['Buenos Aires', -34.6, -58.38], ['Paris', 48.86, 2.35], ['Dubai', 25.2, 55.27], ['Seoul', 37.57, 126.98], ['Toronto', 43.65, -79.38], ['Jakarta', -6.2, 106.85], ['Nairobi', -1.29, 36.82], ['Honolulu', 21.31, -157.86], ['Reykjavík', 64.15, -21.94]].map(([n, la, lo]) => ({ n, lat: la, lon: lo }));
+  const PRI = { station: 9, science: 8, weather: 6, earth: 5, gnss: 4, oneweb: 3, comms: 2, starlink: 1, other: 1 };
+  let PV = null, PT = 0, PASSW = [], PEL = null, Q = [], RATE = [];
+  function senseInit() {
+    PASSW = CAT.sats.filter(s => (s.tag === 'station' && /^(ISS \(ZARYA|CSS \(TIANHE)/.test(s.name)) || s.tag === 'science' || (s.bright && s.tag !== 'starlink')).slice(0, 220).map(s => s.i);
+    PEL = new Float32Array(PASSW.length * CITIES.length).fill(NaN);
+  }
+  function coinOf(s) { const c = COINS.taken.get(s.norad); if (c) return '$' + c.symbol; const t = globe.tags && globe.tags.get(s.i); return t || ''; }
+  function sense(buf, t) {
+    if (!CAT) return; const n = Math.min(CAT.sats.length, buf.length / 4), S = CAT.sats;
+    const tot = {}, lt = {}; let L = 0, N = 0;
+    for (let i = 0; i < n; i++) { const o = i * 4; if (buf[o] !== buf[o]) continue; const g = S[i].tag; tot[g] = (tot[g] || 0) + 1; N++; if (buf[o + 3] > .5) { lt[g] = (lt[g] || 0) + 1; L++; } }
+    if (performance.now() - (sense.ui || 0) > 500) { sense.ui = performance.now(); $('#layers').querySelectorAll('.ly').forEach(b => { const g = b.dataset.t, k = tot[g] ? (lt[g] || 0) / tot[g] : 0; b.querySelector('u').style.width = (k * 100).toFixed(1) + '%'; b.title = `${OB.num(tot[g] || 0)} · ${Math.round(k * 100)}% in sunlight`; });
+    $('#litN').textContent = N ? `☀ ${Math.round(L / N * 100)}% in sunlight` : ''; }
+    const dt = t - PT;
+    if (PV && dt > 0 && dt < 15 * 6e4) {
+      let laps = 0, rises = 0; const said = new Set();
+      for (let i = 0; i < n; i++) {
+        const o = i * 4, la = buf[o], pa = PV[o]; if (la !== la || pa !== pa) continue; const s = S[i];
+        let pr = PRI[s.tag] || 1; if (i === focusI) pr = 20; else if (coinOf(s)) pr = 15; else if (s.bright) pr = Math.max(pr, 7);
+        const loud = pr > 1 || Math.random() < .02;
+        if (pa < 0 && la >= 0 && buf[o + 2] < 30000) { laps++; if (loud) ev({ k: 'lap', i, t, pr }, said, la, buf[o + 1]); }
+        const a = PV[o + 3] > .5, b = buf[o + 3] > .5; if (a !== b) { if (b) rises++; if (loud) ev({ k: b ? 'rise' : 'set', i, t, pr: pr - .5 }, said, la, buf[o + 1]); }
+      }
+      for (let a = 0; a < PASSW.length; a++) { const i = PASSW[a], o = i * 4; if (buf[o] !== buf[o]) continue;
+        for (let c = 0; c < CITIES.length; c++) { const k = a * CITIES.length + c, el = lookFrom(CITIES[c], buf[o], buf[o + 1], buf[o + 2]).el, pe = PEL[k]; PEL[k] = el; if (pe === pe && pe < 10 && el >= 10) ev({ k: 'pass', i, t, c, pr: (i === focusI ? 20 : coinOf(S[i]) ? 15 : 9) + .5 }, said, c, i); } }
+      RATE.push([t, dt, laps, rises]); while (RATE.length > 2 && t - RATE[0][0] > 10 * 6e4) RATE.shift();
+      const sm = RATE.reduce((z, r) => z + r[1], 0) / 6e4, lp = RATE.reduce((z, r) => z + r[2], 0), rs = RATE.reduce((z, r) => z + r[3], 0);
+      if (sm > .3) $('#feedRate').textContent = `↺ ${OB.num(lp / sm)} · ☀ ${OB.num(rs / sm)} /min`;
+    } else { RATE = []; if (PEL) PEL.fill(NaN); if (PV) { Q = []; const d = document.createElement('div'); d.className = 'ev jump'; d.textContent = `clock → ${hhmmss(t)} utc`; const f = $('#feed'); f.prepend(d); while (f.children.length > (mob ? 5 : 9)) f.lastChild.remove(); } }
+    PV = buf; PT = t;
+  }
+  function ev(e, said, a, b) { const key = e.k + ':' + Math.round(a) + ':' + Math.round(b); if (said.has(key)) return; said.add(key); e.at = performance.now(); Q.push(e); if (Q.length > 500) { Q.sort((x, y) => y.pr - x.pr); Q.length = 300; } }
+  const KIND = { lap: ['↺', 'lap', 'var(--acc)'], rise: ['+', 'rise', 'var(--gold)'], set: ['−', 'set', 'var(--ink3)'], pass: ['^', 'pass', 'var(--burn)'] };
+  function feedTick() {
+    const pn = performance.now(); Q = Q.filter(e => pn - e.at < (CLK.isLive() ? 25000 : 4000)); if (!Q.length || !CAT) return;
+    let bi = 0; for (let k = 1; k < Q.length; k++) if (Q[k].pr > Q[bi].pr || (Q[k].pr === Q[bi].pr && Q[k].t > Q[bi].t)) bi = k;
+    const e = Q.splice(bi, 1)[0], s = CAT.sats[e.i], [g, , col] = KIND[e.k], cn = coinOf(s);
+    const what = e.k === 'lap' ? `orbit #${OB.num(ORB.orbitNo(OB.rec(s), new Date(e.t)))}` : e.k === 'rise' ? 'out of Earth’s shadow' : e.k === 'set' ? 'into Earth’s shadow' : `over ${CITIES[e.c].n}`;
+    const d = document.createElement('a'); d.className = 'ev'; d.href = '#'; d.dataset.i = e.i;
+    d.innerHTML = `<time>${hhmmss(e.t)}</time><i style="color:${col}">${g}</i><b>${esc(s.name.replace(/\s*\((ZARYA|TIANHE)\)/, ''))}</b><span>${what}</span>${cn ? `<em>${esc(cn)}</em>` : ''}`;
+    d.onclick = ev2 => { ev2.preventDefault(); stopTour(); focus(e.i, true); };
+    const f = $('#feed'); f.prepend(d); while (f.children.length > (mob ? 5 : 9)) f.lastChild.remove();
+    PINGS.push({ i: e.i, k: e.k, c: e.c, t0: pn });
+  }
+  let lastPop = 0; setInterval(() => { if (document.hidden) return; const pn = performance.now(); if (CLK.isLive() && pn - lastPop < 640) return; lastPop = pn; feedTick(); }, 300);
+  function pings(x, g) {
+    if (!POS || !PINGS.length) return; const pn = performance.now(), P = POS; PINGS = PINGS.filter(e => pn - e.t0 < 1800);
+    x.save(); x.lineWidth = 1.2;
+    for (const e of PINGS) { const k = (pn - e.t0) / 1800, o = e.i * 4; if (P[o] !== P[o]) continue; const p = g.proj(P[o], P[o + 1], SKY.altR(P[o + 2])); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue;
+      const sx = g.X + p[0] * g.R, sy = g.Y - p[1] * g.R, col = e.k === 'lap' ? '40,110,214' : e.k === 'rise' ? '150,96,0' : e.k === 'set' ? '29,57,52' : '194,71,14';
+      x.strokeStyle = `rgba(${col},${(1 - k) * .9})`; x.beginPath(); x.arc(sx, sy, 3 + k * 20, 0, Math.PI * 2); x.stroke();
+      if (e.k === 'pass') { const cy = CITIES[e.c], q = g.proj(cy.lat, cy.lon, 1); if (q[2] > 0) { const cx = g.X + q[0] * g.R, cyy = g.Y - q[1] * g.R; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(cx, cyy); x.lineTo(sx, sy); x.stroke(); x.setLineDash([]);
+        x.fillStyle = `rgba(${col},${1 - k})`; x.font = `700 11px JBM, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillText('+ ' + cy.n, cx + 4, cyy); } } }
+    x.restore();
+  }
+
+  // click the planet anywhere: what is above that spot at the clock's moment
   function probe(gp, px, py) {
     const pb = $('#probe'); if (!gp || !POS || !CAT) { globe.probe = null; pb.classList.remove('on'); return; }
     stopTour(); const here = { lat: gp.lat, lon: gp.lon }, up = [], n = Math.min(CAT.sats.length, POS.length / 4);
     for (let i = 0; i < n; i++) { const o = i * 4; if (POS[o] !== POS[o]) continue; const l = lookFrom(here, POS[o], POS[o + 1], POS[o + 2]); if (l.el > 30) up.push([l.el, i]); }
     up.sort((a, b) => b[0] - a[0]); globe.probe = { lat: gp.lat, lon: gp.lon, list: up.slice(0, 60).map(u => u[1]) };
     const named = up.filter(([, i]) => CAT.sats[i].tag !== 'starlink').slice(0, 5).concat(up.filter(([, i]) => CAT.sats[i].tag === 'starlink').slice(0, 1));
-    pb.innerHTML = `<button class="x" type="button">×</button><b>${OB.ll(gp.lat, gp.lon)}</b><small>${OB.num(up.length)} satellites more than 30° up from here, right now</small>` + named.map(([el, i]) => `<a data-i="${i}"><span style="color:var(--ink)">${esc(CAT.sats[i].name)}</span><span>${Math.round(el)}°</span></a>`).join('');
+    pb.innerHTML = `<button class="x" type="button">×</button><b>${OB.ll(gp.lat, gp.lon)}</b><small>${OB.num(up.length)} satellites more than 30° up · ${CLK.isLive() ? 'now' : hhmmss(CLK.now()) + ' utc'}</small>` + named.map(([el, i]) => `<a data-i="${i}"><span style="color:var(--ink)">${esc(CAT.sats[i].name)}</span><span>${Math.round(el)}°</span></a>`).join('');
     const sky = $('#sky'), W = sky.clientWidth, H = sky.clientHeight; pb.style.left = Math.min(W - 290, px + 18) + 'px'; pb.style.top = Math.min(H - 260, Math.max(10, py - 20)) + 'px'; pb.classList.add('on');
     pb.querySelector('.x').onclick = () => { globe.probe = null; pb.classList.remove('on'); };
     pb.querySelectorAll('a').forEach(a => a.onclick = () => { focus(+a.dataset.i, true); pb.classList.remove('on'); globe.probe = null; });
   }
-  addEventListener('keydown', e => { if (e.key === 'Escape') { globe.probe = null; $('#probe').classList.remove('on'); } });
 
   // ---------- data ----------
   async function boot() {
-    try { CAT = await OB.catalog(); } catch (e) { $('#hcount').textContent = 'catalogue offline'; $('#ctab').innerHTML = `<div class="empty"><b>The catalogue didn’t answer.</b>${esc(e.message)}. It retries on the next visit.</div>`; return; }
-    $('#hcount').textContent = OB.num(CAT.count);
-    const by = {}; CAT.sats.forEach(s => by[s.tag] = (by[s.tag] || 0) + 1); chips(by);
+    try { CAT = await OB.catalog(); } catch (e) { $('#layers').innerHTML = `<div class="empty">catalogue offline</div>`; $('#ctab').innerHTML = `<div class="empty"><b>The catalogue didn’t answer.</b>${esc(e.message)}. It retries on the next visit.</div>`; return; }
+    const by = {}; CAT.sats.forEach(s => by[s.tag] = (by[s.tag] || 0) + 1); layers(by); senseInit();
     globe.setSats(CAT.sats); await SKY.start(CAT.sats);
-    SKY.on(buf => { POS = buf; globe.setPos(buf); });
+    SKY.on((buf, t) => { POS = buf; globe.setPos(buf); sense(buf, t); updInsp(); });
     $('#catMeta').textContent = `${OB.num(CAT.count)} active · elements ${OB.ago(CAT.at)}`;
-    COINS = await OB.coins(); drawCard();
+    const iss = CAT.by.get(25544); if (iss && focusI == null) focus(iss.i, false, true);
+    COINS = await OB.coins(); coinInsp();
     tape(by); catalogue(); rulesDemo(); coinsGrid(); falling(); overheadInit();
-    const iss = CAT.by.get(25544); if (iss && !mob) setTimeout(() => { if (focusI == null) focus(iss.i, false, true); }, 2600);
-    quick(); types(by); pairing();
-  }
-  function quick() {
-    if (!$('#quick')) return;
-    const Q = [[25544, 'ISS'], [48274, 'Tiangong'], [20580, 'Hubble'], [33591, 'NOAA 19'], [49260, 'Landsat 9'], [41866, 'GOES-16']].filter(([n]) => CAT.by.has(n));
-    $('#quick').innerHTML = Q.map(([n, t]) => `<button type="button" data-n="${n}">${t}</button>`).join('');
-    $('#quick').querySelectorAll('button').forEach(b => b.onclick = () => { stopTour(); focus(CAT.by.get(+b.dataset.n).i, true); });
+    types(by); pairing();
   }
   // the sky by type: ASCII bars that fill when they come into view; a row lights its group up on the globe
   function types(by) {
@@ -100,7 +240,7 @@
     const fill = () => { const w = W(); box.querySelectorAll('.ty').forEach((r, j) => { const n = +r.querySelector('.bars').dataset.n, full = Math.max(1, Math.round(n / max * w)); const t0 = performance.now() + j * 90;
       const step = t => { const k = Math.max(0, Math.min(1, (t - t0) / 1100)), e = 1 - Math.pow(1 - k, 3), m = Math.round(full * e); r.querySelector('.bars').innerHTML = '#'.repeat(m) + '<span>' + '.'.repeat(Math.max(0, w - m)) + '</span>'; r.querySelector('.n').textContent = OB.num(n * e); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }); };
     new IntersectionObserver((es, io) => { if (es[0].isIntersecting) { fill(); io.disconnect(); } }, { threshold: .3 }).observe(box);
-    box.querySelectorAll('.ty').forEach(r => r.onclick = () => { const t = r.dataset.t; tagsEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.t === t)); filter = new Set([t]); globe.filter = filter; stopTour(); $('#sky').scrollIntoView({ behavior: 'smooth' }); });
+    box.querySelectorAll('.ty').forEach(r => r.onclick = () => { setLayer(r.dataset.t); stopTour(); $('#sky').scrollIntoView({ behavior: 'smooth' }); });
   }
   // the ticker: real counts and real positions
   function tape(by) {
@@ -148,7 +288,7 @@
   const compass = a => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(a / 45) % 8];
   function sunEl(h) { const s = ORB.subsolar(new Date()); return Math.asin(Math.sin(h.lat * D) * Math.sin(s.lat * D) + Math.cos(h.lat * D) * Math.cos(s.lat * D) * Math.cos((h.lon - s.lon) * D)) / D; }
   function sky() {
-    if (!HERE || !POS || !CAT) return; const up = [], P = POS, n = Math.min(CAT.sats.length, P.length / 4); const se = sunEl(HERE), dark = se < -6;
+    if (!HERE || !POS || !CAT || !CLK.isLive()) return; const up = [], P = POS, n = Math.min(CAT.sats.length, P.length / 4); const se = sunEl(HERE), dark = se < -6;
     for (let i = 0; i < n; i++) { const o = i * 4; if (P[o] !== P[o]) continue; const l = lookFrom(HERE, P[o], P[o + 1], P[o + 2]); if (l.el > 0) up.push({ i, ...l, lit: P[o + 3] > .5 }); }
     up.sort((a, b) => b.el - a.el);
     $('#domeN').textContent = `${OB.num(up.length)} above the horizon · sun ${se > 0 ? 'up' : dark ? 'down, sky dark' : 'just down, twilight'}`;
@@ -310,7 +450,7 @@
       $('#pairs').innerHTML = PAIRS.length ? PAIRS.slice(0, 24).map(p => `<a href="/sat?n=${p.norad}" class="${p.mint === fresh ? 'new' : ''}">${p.icon ? `<img src="${esc(p.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : '<span class="gl">$</span>'}<div style="min-width:0"><b>$${esc(p.symbol)} → ${esc(p.sat)}</b><small>${OB.usd(p.mcap)}${p.ch1h != null ? ' · 1h ' + (p.ch1h >= 0 ? '+' : '') + Math.round(p.ch1h) + '%' : ''} · ${OB.ago(p.at)}</small></div><span class="dim" style="font-size:10.5px">${p.norad}</span></a>`).join('') : '<div class="empty">No coin paired yet. Be the first.</div>';
       // the coins ride their satellites on the globe: the biggest one per satellite gets the label
       const best = new Map(); for (const p of PAIRS) { const s = CAT.by.get(p.norad); if (!s) continue; const o = best.get(s.i); if (!o || (p.mcap || 0) > (o.mcap || 0)) best.set(s.i, p); }
-      globe.tags = new Map([...best].sort((a, b) => (b[1].mcap || 0) - (a[1].mcap || 0)).slice(0, 30).map(([i, p]) => [i, '$' + p.symbol]));
+      globe.tags = new Map([...best].sort((a, b) => (b[1].mcap || 0) - (a[1].mcap || 0)).slice(0, 30).map(([i, p]) => [i, '$' + p.symbol])); coinInsp();
     } catch (e) {}
   }
   // the link: a coin glyph and a satellite glyph, a dotted line pulsing between them; a burst when they pair
@@ -368,5 +508,4 @@
   };
 
   boot(); engine();
-  addEventListener('orbt:enter', () => { const h = $('.sky .tl h1'); if (h) OB.decode(h, 1100); });
 })();
