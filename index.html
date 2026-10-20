@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="/assets/img/fav180.png">
 <link rel="preload" href="/assets/fonts/JBM-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/JBM-800.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/orbt.css?v=5">
+<link rel="stylesheet" href="/assets/css/orbt.css?v=6">
 <script>if(location.search.indexOf("skip")<0)document.documentElement.classList.add("booting")</script>
 <script>window.__cat = fetch('/api/sky?op=catalog').catch(() => null);</script>
 </head>
@@ -38,20 +38,34 @@
   <canvas id="globe" aria-label="Live globe with every active satellite"></canvas>
   <div class="tip" id="tip"></div>
   <div class="probe" id="probe"></div>
-  <div class="ov tl">
-    <div class="k"><span class="live"></span><span id="hcount">…</span> satellites, live</div>
-    <h1>Every satellite<br>in orbit is <em>a coin.</em></h1>
-    <div class="row"><a class="btn" href="/launch">launch a coin ↗</a><a class="btn o" href="#catalogue">browse the catalogue</a></div>
-  </div>
-  <div class="ov tr">
-    <div class="card" id="card"></div>
-  </div>
-  <div class="ov bl">
-    <div class="chips" id="tags"></div>
-    <div class="hint">drag · click · double-click</div>
-  </div>
-  <div class="zoomer"><button type="button" id="zIn" aria-label="zoom in">+</button><button type="button" id="zOut" aria-label="zoom out">−</button><button type="button" id="zTour" class="on" aria-label="tour">tour</button></div>
 
+  <div class="hud hl">
+    <div class="pnl" id="pLayers">
+      <div class="ph"><span>layers</span><span class="r" id="litN"></span></div>
+      <div class="layers" id="layers"><div class="empty">…</div></div>
+      <div class="views" id="views"><button type="button" data-v="trails" class="on">orbit</button><button type="button" data-v="labels" class="on">labels</button><button type="button" data-v="rings" class="on">rings</button><button type="button" data-v="coins" class="on">coins</button></div>
+    </div>
+    <div class="pnl" id="pFeed">
+      <div class="ph"><span><i class="live"></i>events</span><span class="r" id="feedRate"></span></div>
+      <div class="feed" id="feed"></div>
+    </div>
+  </div>
+
+  <div class="hud hr">
+    <div class="pnl insp" id="insp"></div>
+  </div>
+
+  <div class="hud hb">
+    <div class="tbar" id="tbar">
+      <button type="button" id="tPlay" class="ic" aria-label="pause">❚❚</button>
+      <div class="clock"><b id="tClock">--:--:--</b><small id="tState">utc · live</small></div>
+      <div class="scrub" id="scrub" aria-label="time" title="drag through the last and next 12 hours · grey: when the focused satellite is in Earth’s shadow"><canvas></canvas></div>
+      <div class="warp" id="warp"><button type="button" data-w="1" class="on">1×</button><button type="button" data-w="60">60×</button><button type="button" data-w="600">600×</button><button type="button" data-w="3600">1h/s</button></div>
+      <button type="button" id="tLive" class="lv on">live</button>
+      <span class="sep"></span>
+      <button type="button" id="zOut" class="ic" aria-label="zoom out">−</button><button type="button" id="zIn" class="ic" aria-label="zoom in">+</button><button type="button" id="zTour" class="on">tour</button>
+    </div>
+  </div>
 </section>
 
 <div class="tape"><div class="in" id="tape"></div></div>
@@ -208,8 +222,8 @@
 <script src="/assets/js/land.js"></script>
 <script src="/assets/js/rules.js?v=2"></script>
 <script src="/assets/js/core.js?v=3"></script>
-<script src="/assets/js/sky.js?v=3"></script>
-<script src="/assets/js/home.js?v=6"></script>
+<script src="/assets/js/sky.js?v=4"></script>
+<script src="/assets/js/home.js?v=7"></script>
 <script src="/assets/js/intro.js?v=5"></script>
 </body>
 </html>
