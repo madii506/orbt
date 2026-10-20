@@ -14,12 +14,12 @@
 <link rel="apple-touch-icon" href="/assets/img/fav180.png">
 <link rel="preload" href="/assets/fonts/JBM-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/JBM-800.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/orbt.css?v=3">
+<link rel="stylesheet" href="/assets/css/orbt.css?v=4">
 <script>if(location.search.indexOf("skip")<0)document.documentElement.classList.add("booting")</script>
 <script>window.__cat = fetch('/api/sky?op=catalog').catch(() => null);</script>
 </head>
 <body>
-<div id="intro" aria-label="orbt is loading" role="img"><canvas></canvas><div class="bbar"><i></i></div><span class="bskip">move through it · click to launch · skip ›</span></div>
+<div id="intro" aria-label="orbt is loading" role="img"><canvas></canvas><div class="hint">drag to spin · click to launch a satellite</div><div class="bbar"><i></i></div><button class="bskip" type="button">skip ›</button></div>
 <canvas id="amb" aria-hidden="true"></canvas>
 
 <header class="bar">
@@ -48,9 +48,6 @@
     <div class="row"><a class="btn" href="/launch">launch a coin ↗</a><a class="btn o" href="#catalogue">browse the catalogue</a></div>
   </div>
   <div class="ov tr">
-    <div class="find"><input class="inp" id="q" placeholder="find a satellite: name or NORAD id" autocomplete="off" spellcheck="false" aria-label="Find a satellite"></div>
-    <div class="res" id="res"></div>
-    <div class="quick" id="quick"></div>
     <div class="card" id="card"></div>
   </div>
   <div class="ov bl">
@@ -216,7 +213,7 @@
 <script src="/assets/js/rules.js?v=2"></script>
 <script src="/assets/js/core.js?v=3"></script>
 <script src="/assets/js/sky.js?v=2"></script>
-<script src="/assets/js/home.js?v=3"></script>
-<script src="/assets/js/intro.js?v=3"></script>
+<script src="/assets/js/home.js?v=4"></script>
+<script src="/assets/js/intro.js?v=4"></script>
 </body>
 </html>
