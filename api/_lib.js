@@ -136,6 +136,8 @@ function ready() {
       `CREATE INDEX IF NOT EXISTS ob_coins_state ON ob_coins(state, ticked_at)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS ob_coins_one_per_sat ON ob_coins(norad) WHERE state IN ('waiting','creating','live')`,
       `CREATE TABLE IF NOT EXISTS ob_cat (k text PRIMARY KEY, v text NOT NULL, at timestamptz NOT NULL DEFAULT now())`,
+      `CREATE TABLE IF NOT EXISTS ob_pairs (mint text PRIMARY KEY, norad int NOT NULL, sat text NOT NULL DEFAULT '', symbol text NOT NULL, name text NOT NULL, icon text, who text, at timestamptz NOT NULL DEFAULT now())`,
+      `CREATE INDEX IF NOT EXISTS ob_pairs_norad ON ob_pairs(norad)`,
       `CREATE TABLE IF NOT EXISTS ob_state (id text NOT NULL, rule int NOT NULL, streak int NOT NULL DEFAULT 0, armed boolean NOT NULL DEFAULT true, last_read timestamptz,
         last_fire timestamptz, last_key text, fails int NOT NULL DEFAULT 0, reading text, PRIMARY KEY (id, rule))`,
       `CREATE TABLE IF NOT EXISTS ob_log (n bigserial PRIMARY KEY, id text, kind text NOT NULL, rule int, text text NOT NULL, sol float8, sig text, src text, at timestamptz NOT NULL DEFAULT now())`,
