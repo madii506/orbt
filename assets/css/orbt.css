@@ -374,3 +374,13 @@ html.booting .sky .tr{transform:translateX(16px)}
 .pairs img{width:34px;height:34px;object-fit:cover;border:1px solid var(--line)}
 .pairs b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pairs small{color:var(--ink3);font-size:10.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.probe{position:absolute;z-index:6;width:270px;background:rgba(246,243,236,.96);border:1px solid var(--line2);padding:12px 14px;font-size:12px;opacity:0;transform:translateY(6px) scale(.98);transition:opacity .25s,transform .25s var(--ease);pointer-events:none;box-shadow:0 20px 40px -30px rgba(29,57,52,.6)}
+.probe.on{opacity:1;transform:none;pointer-events:auto}
+.probe b{font-size:14px;display:block}
+.probe small{display:block;color:var(--ink3);margin:2px 0 8px}
+.probe a{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);cursor:pointer}
+.probe a:hover{color:var(--acc)}
+.probe a span{color:var(--ink3)}
+.probe .x{position:absolute;right:8px;top:6px;cursor:pointer;color:var(--ink3);background:none;border:0;font-size:14px}
+.sky .tl h1{margin-bottom:18px}
