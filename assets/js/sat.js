@@ -25,7 +25,7 @@
     tickPos(); setInterval(tickPos, 1000);
     facts(); live(); setInterval(live, 1000); track(); setInterval(track, 15000); passes();
     let coin = null; try { coin = (await OB.api('coins?n=' + n)).coin; } catch (e) {}
-    chips(coin); coinBox(coin);
+    chips(coin); coinBox(coin); pairs();
     let sc = null; try { sc = (await OB.api('sky?op=sat&n=' + n)).satcat; } catch (e) {}
     if (sc) facts(sc);
   })();
@@ -78,6 +78,11 @@
     }
     const p = ORB.at(R, now); if (p) { const [px, py] = toXY(p.lat, p.lon); x.font = `800 ${fs + 5}px JBM, monospace`; x.fillStyle = '#1d3934'; x.fillText('=[]=', px, py); x.font = `700 ${fs + 1}px JBM, monospace`; x.textAlign = 'left'; x.fillText(S.name, px + 22, py - 12); }
     const [hx, hy] = toXY(HERE.lat, HERE.lon); x.textAlign = 'center'; x.fillStyle = '#c2470e'; x.font = `800 ${fs + 3}px JBM, monospace`; x.fillText('+', hx, hy); x.font = `${fs}px JBM, monospace`; x.fillText(HERE.name.split(' (')[0], hx, hy + 12);
+  }
+  // coins paired with it: public links, with their live market
+  function pairs() {
+    OB.api('pair?op=list&n=' + n).then(j => { const L = j.pairs || [];
+      $('#pairBox').innerHTML = `<div class="con"><div class="ct">coins riding it<span class="r">${L.length} paired · <a class="acc" href="/#pair">pair a coin with it →</a></span></div>${L.length ? `<div class="pairs">${L.map(p => `<a href="https://pump.fun/coin/${esc(p.mint)}" target="_blank" rel="noopener">${p.icon ? `<img src="${esc(p.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : '<span class="gl">$</span>'}<div style="min-width:0"><b>$${esc(p.symbol)}</b><small>${esc(p.name)} · ${OB.usd(p.mcap)}${p.ch1h != null ? ' · 1h ' + (p.ch1h >= 0 ? '+' : '') + Math.round(p.ch1h) + '%' : ''}</small></div><span class="dim" style="font-size:10.5px">${OB.ago(p.at)}</span></a>`).join('')}</div>` : `<div class="empty">No coin rides ${esc(S.name)} yet. Any pump.fun coin can be paired with it, free.</div>`}</div>`; }).catch(() => {});
   }
   // the coin, if there is one: market, chest, rules with their latest readings, and everything the engine did
   function coinBox(coin) {

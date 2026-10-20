@@ -10,6 +10,7 @@
   globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .55, cy: mob ? .5 : .54, r: mob ? .38 : .34, lon: -40, lat: 22, spin: 2.4, font: 12,
     onPick: i => { focus(i, true); stopTour(); },
     onHover: i => { if (i != null) idle = performance.now(); } });
+  window.__globe = globe;
   $('#globe').addEventListener('pointerdown', () => { idle = performance.now(); });
   $('#zIn').onclick = () => globe.setZoom((globe.zt || globe.zoom) * 1.25); $('#zOut').onclick = () => globe.setZoom((globe.zt || globe.zoom) / 1.25);
   // the tour: when nobody is touching the globe, it flies from one notable satellite to the next
@@ -67,7 +68,7 @@
     COINS = await OB.coins(); drawCard();
     tape(by); catalogue(); rulesDemo(); coinsGrid(); falling(); overheadInit();
     const iss = CAT.by.get(25544); if (iss && !mob) setTimeout(() => { if (focusI == null) focus(iss.i, false, true); }, 2600);
-    quick(); types(by);
+    quick(); types(by); pairing();
   }
   function quick() {
     const Q = [[25544, 'ISS'], [48274, 'Tiangong'], [20580, 'Hubble'], [33591, 'NOAA 19'], [49260, 'Landsat 9'], [41866, 'GOES-16']].filter(([n]) => CAT.by.has(n));
@@ -252,6 +253,64 @@
       x.font = '800 15px JBM, monospace'; x.fillStyle = '#1d3934'; x.fillText('=[]=', sx, sy);
       x.font = '11px JBM, monospace'; x.fillStyle = 'rgba(29,57,52,.6)'; x.fillText('lap start · ascending node', X, Y - ry - 14); x.fillText('|', X, Y - ry - 3);
       x.fillStyle = '#286ed6'; x.font = '700 12px JBM, monospace'; x.fillText(`${(ph * 100).toFixed(2)}%  ·  next fire in ${OB.dur(ORB.nextOrbit(r, now) - now)}`, X, H - 16);
+    };
+    requestAnimationFrame(draw);
+  }
+
+  // ---------- pair any pump.fun coin with a satellite ----------
+  let PC = null, PS = null, PAIRS = [];
+  const coinRow = c => `<a data-m="${esc(c.mint)}">${c.icon ? `<img src="${esc(c.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : '<span class="gl">$</span>'}<div style="min-width:0"><b>$${esc(c.symbol)}</b><small>${esc(c.name)} · ${OB.short(c.mint)}</small></div><span>${OB.usd(c.mcap)}${c.ch1h != null ? `<br><em class="${c.ch1h >= 0 ? 'up' : 'down'}" style="font-style:normal">${c.ch1h >= 0 ? '+' : ''}${Math.round(c.ch1h)}%</em>` : ''}</span></a>`;
+  const satRow = s => { const p = POS && POS[s.i * 4] === POS[s.i * 4] ? POS[s.i * 4 + 2] : null; return `<a data-n="${s.norad}"><span class="gl">=[]=</span><div style="min-width:0"><b>${esc(s.name)}</b><small>${s.norad} · ${OB.TAGS[s.tag][0]}</small></div><span>${p != null ? OB.num(p) + ' km' : ''}</span></a>`; };
+  function pairing() {
+    const pick = c => { PC = c; $('#pvCoin').innerHTML = `${c.icon ? `<img src="${esc(c.icon)}" alt="" style="width:34px;height:34px;object-fit:cover;border:1px solid var(--line);float:left;margin-right:8px" referrerpolicy="no-referrer">` : ''}<b>$${esc(c.symbol)}</b>${esc(c.name)}<br><span class="dim">${OB.usd(c.mcap)}</span>`; $('#pvCoin').classList.remove('dim'); ready(); };
+    const pickS = s => { PS = s; $('#pvSat').innerHTML = `<b>${esc(s.name)}</b>NORAD ${s.norad}<br><span class="dim">${OB.TAGS[s.tag][0]}</span>`; $('#pvSat').classList.remove('dim'); ready(); };
+    const ready = () => { $('#pairBtn').disabled = !(PC && PS); $('#pairState').textContent = PC && PS ? 'ready' : PC ? 'now pick a satellite' : PS ? 'now pick a coin' : 'pick both'; $('#pairBtn').textContent = PC && PS ? `pair $${PC.symbol} with ${PS.name.slice(0, 18)} →` : 'pair them →'; };
+    const bindCoins = (box, list) => box.querySelectorAll('a').forEach(a => a.onclick = () => { box.querySelectorAll('a').forEach(x => x.classList.toggle('on', x === a)); pick(list.find(c => c.mint === a.dataset.m)); });
+    let h; $('#pcQ').oninput = () => { clearTimeout(h); const v = $('#pcQ').value.trim(); if (v.length < 2) { $('#pcRes').innerHTML = ''; return; } $('#pcRes').innerHTML = '<div class="empty">searching pump.fun coins…</div>';
+      h = setTimeout(async () => { try { const j = await OB.api('pair?op=search&q=' + encodeURIComponent(v)); $('#pcRes').innerHTML = j.coins.length ? j.coins.map(coinRow).join('') : '<div class="empty">No pump.fun coin by that name or address.</div>'; bindCoins($('#pcRes'), j.coins); } catch (e) { $('#pcRes').innerHTML = `<div class="empty">${esc(e.message)}</div>`; } }, 300); };
+    OB.api('pair?op=trending').then(j => { const L = j.coins || []; $('#trAt').textContent = L.length + ' coins · 1h'; $('#trend').innerHTML = L.slice(0, 12).map(c => `<button type="button" data-m="${esc(c.mint)}">${c.icon ? `<img src="${esc(c.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : ''}<div style="min-width:0"><b>$${esc(c.symbol)}</b><em class="${(c.ch1h || 0) >= 0 ? 'up' : 'down'}">${c.ch1h != null ? (c.ch1h >= 0 ? '+' : '') + Math.round(c.ch1h) + '%' : OB.usd(c.mcap)}</em></div></button>`).join('') || '<div class="empty">The boards are quiet.</div>';
+      $('#trend').querySelectorAll('button').forEach(b => b.onclick = () => { $('#trend').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); pick(L.find(c => c.mint === b.dataset.m)); }); }).catch(() => { $('#trend').innerHTML = '<div class="empty">Jupiter didn’t answer. Search by name instead.</div>'; });
+    let h2; $('#psQ').oninput = () => { clearTimeout(h2); h2 = setTimeout(() => { const v = $('#psQ').value.trim().toLowerCase(); if (!v) { $('#psRes').innerHTML = ''; return; }
+      const L = CAT.sats.filter(s => s.name.toLowerCase().includes(v) || String(s.norad) === v).sort((a, b) => (b.tag === 'station') - (a.tag === 'station') || b.bright - a.bright || a.name.length - b.name.length).slice(0, 30);
+      $('#psRes').innerHTML = L.map(satRow).join('') || '<div class="empty">No active satellite by that name.</div>'; bindSats($('#psRes')); }, 120); };
+    const bindSats = box => box.querySelectorAll('a').forEach(a => a.onclick = () => { OB.$$('#psRes a, #psSug a').forEach(x => x.classList.toggle('on', x === a)); pickS(CAT.by.get(+a.dataset.n)); });
+    const sug = () => { // satellites over the visitor right now, then the famous ones
+      const up = []; if (HERE && POS) { const n = Math.min(CAT.sats.length, POS.length / 4); for (let i = 0; i < n; i++) { const o = i * 4; if (POS[o] !== POS[o]) continue; const s = CAT.sats[i]; if (s.tag === 'starlink' && !s.bright) continue; const l = lookFrom(HERE, POS[o], POS[o + 1], POS[o + 2]); if (l.el > 25) up.push([l.el, s]); } }
+      up.sort((a, b) => b[0] - a[0]); const L = up.slice(0, 5).map(x => x[1]).concat([25544, 48274, 20580, 33591].map(n => CAT.by.get(n)).filter(Boolean)).filter((s, i, a) => a.indexOf(s) === i).slice(0, 8);
+      $('#psSug').innerHTML = L.map(satRow).join(''); bindSats($('#psSug'));
+    };
+    setTimeout(sug, 2500); setInterval(() => { if (!PS) sug(); }, 30000);
+    $('#pairBtn').onclick = async () => {
+      if (!PC || !PS) return; const b = $('#pairBtn'); b.disabled = true; b.textContent = 'pairing…'; $('#pairOut').className = 'out'; $('#pairOut').textContent = '';
+      try { const j = await OB.api('pair', { mint: PC.mint, norad: PS.norad }); $('#pairOut').innerHTML = `<b>$${esc(j.pair.symbol)} now rides ${esc(j.pair.sat)}.</b> <a class="acc" href="/sat?n=${j.pair.norad}">open its page →</a>`; linkFx = performance.now();
+        await loadPairs(j.pair.mint); setTimeout(() => { focus(PS.i, true); stopTour(); $('#sky').scrollIntoView({ behavior: 'smooth' }); }, 1600); }
+      catch (e) { $('#pairOut').className = 'out err'; $('#pairOut').textContent = e.message; }
+      b.disabled = false; ready();
+    };
+    linkCanvas(); loadPairs(); setInterval(() => loadPairs(), 30000);
+  }
+  async function loadPairs(fresh) {
+    try { const j = await OB.api('pair?op=list'); PAIRS = j.pairs || []; $('#pairCount').textContent = `${OB.num(j.total)} paired`; $('#pairMeta').textContent = `${OB.num(j.total)} coins paired · free · no wallet`;
+      $('#pairs').innerHTML = PAIRS.length ? PAIRS.slice(0, 24).map(p => `<a href="/sat?n=${p.norad}" class="${p.mint === fresh ? 'new' : ''}">${p.icon ? `<img src="${esc(p.icon)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : '<span class="gl">$</span>'}<div style="min-width:0"><b>$${esc(p.symbol)} → ${esc(p.sat)}</b><small>${OB.usd(p.mcap)}${p.ch1h != null ? ' · 1h ' + (p.ch1h >= 0 ? '+' : '') + Math.round(p.ch1h) + '%' : ''} · ${OB.ago(p.at)}</small></div><span class="dim" style="font-size:10.5px">${p.norad}</span></a>`).join('') : '<div class="empty">No coin paired yet. Be the first.</div>';
+      // the coins ride their satellites on the globe: the biggest one per satellite gets the label
+      const best = new Map(); for (const p of PAIRS) { const s = CAT.by.get(p.norad); if (!s) continue; const o = best.get(s.i); if (!o || (p.mcap || 0) > (o.mcap || 0)) best.set(s.i, p); }
+      globe.tags = new Map([...best].sort((a, b) => (b[1].mcap || 0) - (a[1].mcap || 0)).slice(0, 30).map(([i, p]) => [i, '$' + p.symbol]));
+    } catch (e) {}
+  }
+  // the link: a coin glyph and a satellite glyph, a dotted line pulsing between them; a burst when they pair
+  let linkFx = 0;
+  function linkCanvas() {
+    const c = $('#link'), x = c.getContext('2d'); let W, H; const fit = () => { const d = Math.min(2, devicePixelRatio || 1); W = c.clientWidth; H = c.clientHeight; c.width = W * d; c.height = H * d; x.setTransform(d, 0, 0, d, 0, 0); }; fit(); addEventListener('resize', fit);
+    let vis = true; new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(c);
+    const draw = t => { requestAnimationFrame(draw); if (!vis) return; x.clearRect(0, 0, W, H); const k = t / 1000, ax = 46, bx = W - 56, y = H / 2;
+      x.font = '800 20px JBM, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillStyle = PC ? '#286ed6' : 'rgba(29,57,52,.3)'; x.fillText(PC ? '$' + PC.symbol.slice(0, 6) : '$???', ax, y);
+      // the satellite circles a tiny planet
+      const a = k * 1.4; x.font = '13px JBM, monospace'; x.fillStyle = 'rgba(29,57,52,.5)'; x.fillText('(@)', bx, y); x.font = '800 13px JBM, monospace'; x.fillStyle = PS ? '#1d3934' : 'rgba(29,57,52,.3)'; x.fillText('=[]=', bx + Math.cos(a) * 30, y + Math.sin(a) * 12);
+      const both = PC && PS, n = 22;
+      for (let i = 0; i < n; i++) { const f = i / (n - 1), px = ax + 38 + f * (bx - ax - 86), on = both && ((f - (k * .7) % 1 + 1) % 1) < .12; x.fillStyle = on ? '#286ed6' : both ? 'rgba(29,57,52,.45)' : 'rgba(29,57,52,.15)'; x.fillRect(px - (on ? 2 : 1), y - (on ? 2 : 1), on ? 4 : 2, on ? 4 : 2); }
+      if (linkFx && t - linkFx < 1400) { const f = (t - linkFx) / 1400; x.strokeStyle = `rgba(40,110,214,${1 - f})`; x.lineWidth = 2; x.beginPath(); x.arc(bx, y, 10 + f * 70, 0, Math.PI * 2); x.stroke(); x.lineWidth = 1; }
+      x.font = '11px JBM, monospace'; x.fillStyle = 'rgba(29,57,52,.5)'; x.fillText(both ? 'ready to pair' : 'pick a coin and a satellite', W / 2, H - 14);
     };
     requestAnimationFrame(draw);
   }

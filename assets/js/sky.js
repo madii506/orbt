@@ -43,7 +43,7 @@
     }
     lookAt(lat, lon, ms = 1400) { const f = { lon: this.lon0, lat: this.lat0 }, t0 = performance.now(); let dl = ((lon - f.lon + 540) % 360) - 180; this.anim = { f, t0, ms, dl, dt: Math.max(-60, Math.min(60, lat)) - f.lat }; }
     loop(t) {
-      requestAnimationFrame(this.loop); if (!this.vis || document.hidden) { this.lt = t; return; }
+      requestAnimationFrame(this.loop); if (!this.vis || document.hidden || this.paused) { this.lt = t; return; }
       if (t - this.drawn < 1000 / this.fps - 2) return; const dt = this.lt ? Math.min(.1, (t - this.lt) / 1000) : 0; this.lt = t; this.drawn = t;
       if (this.anim) { const k = Math.min(1, (t - this.anim.t0) / this.anim.ms), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; this.lon0 = this.anim.f.lon + this.anim.dl * e; this.lat0 = this.anim.f.lat + this.anim.dt * e; if (k >= 1) this.anim = null; }
       else if (!this.held) { if (this.inertia) { this.lon0 -= this.inertia * dt; this.inertia *= Math.pow(.05, dt); if (Math.abs(this.inertia) < .2) this.inertia = 0; } if (!OB.RM && !this.focusLock) this.lon0 += this.spin * dt; }
@@ -55,27 +55,7 @@
       const now = new Date(), ss = ORB.subsolar(now), sv = this.proj(ss.lat, ss.lon, 1);
       // the disk
       x.fillStyle = 'rgba(246,243,236,.86)'; x.beginPath(); x.arc(X, Y, R, 0, Math.PI * 2); x.fill();
-      // land and sea, one character per cell
-      const l0 = this.lat0 * D, s0 = Math.sin(l0), c0 = Math.cos(l0);
-      const cols = Math.ceil(2 * R / cw) + 2, rows = Math.ceil(2 * R / ch) + 2, x0 = X - (cols / 2) * cw, y0 = Y - (rows / 2) * ch;
-      const groups = {};
-      const put = (g, col, px, py) => { const k = g + col; (groups[k] || (groups[k] = { g, col, p: [] })).p.push(px, py); };
-      for (let j = 0; j < rows; j++) {
-        const py = y0 + (j + .5) * ch, yy = -(py - Y) / R;
-        for (let i = 0; i < cols; i++) {
-          const px = x0 + (i + .5) * cw, xx = (px - X) / R, rr = xx * xx + yy * yy; if (rr > 1) continue;
-          const z = Math.sqrt(1 - rr);
-          const lat = Math.asin(z * s0 + yy * c0) / D, lon = this.lon0 + Math.atan2(xx, z * c0 - yy * s0) / D;
-          const day = xx * sv[0] + yy * sv[1] + z * sv[2];   // >0 in sunlight
-          const land = LAND.at(lat, ((lon + 540) % 360) - 180);
-          const edge = rr > .955;
-          if (land) { if (day > .04) put(day > .18 ? '#' : '%', day > .18 ? 'rgba(29,57,52,.8)' : 'rgba(29,57,52,.55)', px, py); else put(':', 'rgba(40,110,214,.55)', px, py); }
-          else if (day < -.04) put('.', 'rgba(29,57,52,.2)', px, py);
-          else if (day < .04) put('~', 'rgba(150,96,0,.45)', px, py);             // the terminator: dawn and dusk
-          else if (edge) put('.', 'rgba(29,57,52,.18)', px, py);
-          else if ((Math.round(lat) % 30 === 0 && i % 2 === 0) || (Math.round(((lon % 30) + 30) % 30) === 0 && j % 2 === 0)) put('.', 'rgba(29,57,52,.09)', px, py);
-        }
-      }
+      const groups = this.landGroups(now, sv);
       x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = `${this.f}px JBM, monospace`;
       for (const k in groups) { const G = groups[k]; x.fillStyle = G.col; const p = G.p; for (let n = 0; n < p.length; n += 2) x.fillText(G.g, p[n], p[n + 1]); }
       x.strokeStyle = 'rgba(29,57,52,.5)'; x.lineWidth = 1; x.beginPath(); x.arc(X, Y, R, 0, Math.PI * 2); x.stroke();
@@ -117,6 +97,10 @@
         }
         x.globalAlpha = 1; x.textAlign = 'left'; x.font = `700 ${Math.max(10, this.f - 1)}px JBM, monospace`;
         const said = new Set(); for (const [s, sx, sy] of shells) { const nm = s.name.replace(/\s*\(.*\)/, ''); if (said.has(nm) || said.size > 5) continue; said.add(nm); x.fillStyle = 'rgba(194,71,14,.9)'; x.fillText(nm, sx + 7, sy - 6); }
+        // coins riding their satellites: a ticker label next to each paired satellite
+        if (this.tags && this.tags.size) { x.font = `700 ${Math.max(10, this.f - 1)}px JBM, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
+          for (const [ti, lab] of this.tags) { const o = ti * 4; if (!(P[o] === P[o])) continue; const p = this.proj(P[o], P[o + 1], altR(P[o + 2])); if (p[2] < 0 && p[0] * p[0] + p[1] * p[1] < 1) continue; const sx = X + p[0] * R, sy = Y - p[1] * R;
+            x.strokeStyle = 'rgba(40,110,214,.8)'; x.beginPath(); x.arc(sx, sy, 4, 0, Math.PI * 2); x.stroke(); x.fillStyle = '#286ed6'; x.fillText(lab, sx + 7, sy - 7); } }
         if (this.hover != null && this.hover !== this.focus) { const hs = S[this.hover]; x.strokeStyle = OB.TAGS[hs.tag][1]; x.lineWidth = 1.5; x.beginPath(); x.arc(this.hx, this.hy, 7, 0, Math.PI * 2); x.stroke(); x.lineWidth = 1;
           x.font = `700 ${this.f}px JBM, monospace`; x.textAlign = 'left'; const lb = hs.name + '  ' + hs.norad, tw = x.measureText(lb).width; x.fillStyle = 'rgba(246,243,236,.92)'; x.fillRect(this.hx + 11, this.hy - 9, tw + 10, 18); x.fillStyle = '#1d3934'; x.fillText(lb, this.hx + 16, this.hy); }
         // the focused satellite: its orbit ahead and behind, and its glyph
@@ -125,6 +109,32 @@
       if (this.rip) { const pn = performance.now(); this.rip = this.rip.filter(r => pn - r.t < 700); for (const r of this.rip) { const k = (pn - r.t) / 700; x.strokeStyle = `rgba(40,110,214,${1 - k})`; x.beginPath(); x.arc(r.x, r.y, 4 + k * 34, 0, Math.PI * 2); x.stroke(); } }
       if (this.o.onHover) this.o.onHover(this.hover, this.mx, this.my);
       if (this.o.after) this.o.after(x, this);
+    }
+    // land and sea, one character per cell (also used by the intro to assemble the very same planet)
+    landGroups(now, sv) {
+      const R = this.R, X = this.X, Y = this.Y, cw = this.cw, ch = this.ch;
+      if (!sv) { const ss = ORB.subsolar(now || new Date()); sv = this.proj(ss.lat, ss.lon, 1); }
+      const l0 = this.lat0 * D, s0 = Math.sin(l0), c0 = Math.cos(l0);
+      const cols = Math.ceil(2 * R / cw) + 2, rows = Math.ceil(2 * R / ch) + 2, x0 = X - (cols / 2) * cw, y0 = Y - (rows / 2) * ch;
+      const groups = {};
+      const put = (g, col, px, py) => { const k = g + col; (groups[k] || (groups[k] = { g, col, p: [] })).p.push(px, py); };
+      for (let j = 0; j < rows; j++) {
+        const py = y0 + (j + .5) * ch, yy = -(py - Y) / R;
+        for (let i = 0; i < cols; i++) {
+          const px = x0 + (i + .5) * cw, xx = (px - X) / R, rr = xx * xx + yy * yy; if (rr > 1) continue;
+          const z = Math.sqrt(1 - rr);
+          const lat = Math.asin(z * s0 + yy * c0) / D, lon = this.lon0 + Math.atan2(xx, z * c0 - yy * s0) / D;
+          const day = xx * sv[0] + yy * sv[1] + z * sv[2];   // >0 in sunlight
+          const land = LAND.at(lat, ((lon + 540) % 360) - 180);
+          const edge = rr > .955;
+          if (land) { if (day > .04) put(day > .18 ? '#' : '%', day > .18 ? 'rgba(29,57,52,.8)' : 'rgba(29,57,52,.55)', px, py); else put(':', 'rgba(40,110,214,.55)', px, py); }
+          else if (day < -.04) put('.', 'rgba(29,57,52,.2)', px, py);
+          else if (day < .04) put('~', 'rgba(150,96,0,.45)', px, py);             // the terminator: dawn and dusk
+          else if (edge) put('.', 'rgba(29,57,52,.18)', px, py);
+          else if ((Math.round(lat) % 30 === 0 && i % 2 === 0) || (Math.round(((lon % 30) + 30) % 30) === 0 && j % 2 === 0)) put('.', 'rgba(29,57,52,.09)', px, py);
+        }
+      }
+      return groups;
     }
     drawFocus(s, now) {
       const x = this.x, R = this.R, X = this.X, Y = this.Y, r = OB.rec(s);
@@ -147,16 +157,16 @@
     }
   }
   // the sky engine: one worker, one catalogue, any number of globes
-  let worker = null, ready = null; const subs = new Set();
+  let worker = null, ready = null, lastBuf = null; const subs = new Set();
   function start(sats) {
     if (ready) return ready;
     ready = new Promise(res => {
       worker = new Worker('/assets/js/sky-worker.js');
-      worker.onmessage = e => { if (e.data.type === 'ready') { res(); tick(); setInterval(tick, 1000); } else if (e.data.type === 'pos') subs.forEach(f => f(e.data.buf, e.data.t)); };
+      worker.onmessage = e => { if (e.data.type === 'ready') { res(); tick(); setInterval(tick, 1000); } else if (e.data.type === 'pos') { lastBuf = e.data.buf; subs.forEach(f => f(e.data.buf, e.data.t)); } };
       worker.postMessage({ type: 'init', tle: sats.map(s => [s.l1, s.l2]) });
     });
     const tick = () => { if (!document.hidden) worker.postMessage({ type: 'tick', t: Date.now() }); };
     return ready;
   }
-  window.SKY = { Globe, start, on: f => { subs.add(f); return () => subs.delete(f); }, altR };
+  window.SKY = { Globe, start, on: f => { subs.add(f); return () => subs.delete(f); }, altR, last: () => lastBuf };
 })();
