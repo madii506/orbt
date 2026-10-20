@@ -7,7 +7,7 @@
   // ---------- 01 the sky ----------
   const tip = $('#tip');
   let idle = performance.now();
-  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .56, cy: mob ? .5 : .53, r: mob ? .38 : .36, lon: -40, lat: 22, spin: 2.4, font: 12, lens: true, parallax: !mob, shellLabels: false,
+  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .63, cy: mob ? .5 : .53, r: mob ? .38 : .315, lon: -40, lat: 22, spin: 2.4, font: 12, lens: true, parallax: !mob, shellLabels: false,
     onGround: (gp, px, py) => probe(gp, px, py),
     onPick: i => { focus(i, true); stopTour(); },
     onHover: i => { if (i != null) idle = performance.now(); } });
