@@ -38,7 +38,7 @@
   <a class="cta" href="/launch">launch ↗</a>
 </header>
 <aside class="rail" aria-hidden="true">
-  <a href="#sky">01</a><a href="#overhead">02</a><a href="#catalogue">03</a><a href="#rules">04</a><a href="#coins">05</a><a href="#falling">06</a><a href="#engine">07</a><a href="#faq">08</a>
+  <a href="#sky">01</a><a href="#types">02</a><a href="#overhead">03</a><a href="#catalogue">04</a><a href="#rules">05</a><a href="#coins">06</a><a href="#falling">07</a><a href="#engine">08</a><a href="#faq">09</a>
   <span class="alt">ORBT · GROUND STATION</span>
 </aside>
 
@@ -55,20 +55,31 @@
   <div class="ov tr">
     <div class="find"><input class="inp" id="q" placeholder="find a satellite: name or NORAD id" autocomplete="off" spellcheck="false" aria-label="Find a satellite"></div>
     <div class="res" id="res"></div>
+    <div class="quick" id="quick"></div>
     <div class="card" id="card"></div>
   </div>
   <div class="ov bl">
     <div class="chips" id="tags"></div>
     <div class="hint">drag to turn the planet · click a dot to follow it · dim dots are in Earth’s shadow</div>
   </div>
+  <div class="zoomer"><button type="button" id="zIn" aria-label="zoom in">+</button><button type="button" id="zOut" aria-label="zoom out">−</button><button type="button" id="zTour" class="on" aria-label="tour">tour</button></div>
   <div class="scale">altitude compressed: low orbit hugs the planet,<br>navigation shells float above, the geostationary ring sits outside</div>
 </section>
 
 <div class="tape"><div class="in" id="tape"></div></div>
 
+<section class="sec" id="types">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[02]</span><span>what’s up there</span><span class="rule"></span><span class="meta" id="typeMeta">every active satellite, by what it does</span></div>
+    <h2 class="t rv d1">A crowded sky, <em>counted live.</em></h2>
+    <p class="lede rv d2">Most of what flies is one constellation of internet satellites. Around it: the space stations, the weather watchers, the navigation shells, the telescopes. Tap a row to light that group up on the globe.</p>
+    <div class="types rv" id="typeBars"></div>
+  </div>
+</section>
+
 <section class="sec" id="overhead">
   <div class="wrap">
-    <div class="hd rv"><span class="no">[02]</span><span>overhead now</span><span class="rule"></span><span class="meta" id="ohMeta">your sky, computed in your browser</span></div>
+    <div class="hd rv"><span class="no">[03]</span><span>overhead now</span><span class="rule"></span><span class="meta" id="ohMeta">your sky, computed in your browser</span></div>
     <h2 class="t rv d1">What’s over <em>your head</em> right now.</h2>
     <p class="lede rv d2">Every satellite above your horizon this second, where to look (compass direction and height), and which ones you could see with your own eyes: lit by the sun while your sky is dark. Your location never leaves your browser.</p>
     <div class="where rv d2"><button class="btn s" id="locBtn" type="button">use my location</button><span class="dim">or</span><input class="inp" id="cityQ" placeholder="search a city" autocomplete="off"><div class="res" id="cityRes" style="position:absolute;z-index:5"></div><span class="dim" id="here"></span></div>
@@ -82,7 +93,7 @@
 
 <section class="sec cat" id="catalogue">
   <div class="wrap">
-    <div class="hd rv"><span class="no">[03]</span><span>the catalogue</span><span class="rule"></span><span class="meta" id="catMeta">CelesTrak public element sets</span></div>
+    <div class="hd rv"><span class="no">[04]</span><span>the catalogue</span><span class="rule"></span><span class="meta" id="catMeta">CelesTrak public element sets</span></div>
     <h2 class="t rv d1">Every one of them <em>can be launched.</em></h2>
     <p class="lede rv d2">One coin per satellite. The first launch takes it, and nobody can launch a second coin on the same satellite. Altitudes below are live, recomputed from each satellite’s orbit every few seconds.</p>
     <div class="con rv" style="margin-top:26px">
@@ -96,14 +107,15 @@
 
 <section class="sec" id="rules">
   <div class="wrap">
-    <div class="hd rv"><span class="no">[04]</span><span>how a rule fires</span><span class="rule"></span><span class="meta">computed from the real orbit, every engine tick</span></div>
+    <div class="hd rv"><span class="no">[05]</span><span>how a rule fires</span><span class="rule"></span><span class="meta">computed from the real orbit, every engine tick</span></div>
     <h2 class="t rv d1">When it moves, <em>your coin moves.</em></h2>
-    <p class="lede rv d2">A coin on orbt carries a rulebook: up to six lines of <b>when its satellite does something → the coin does something</b>. The engine computes the satellite’s position from its latest element set every few minutes and fires a rule once per real event: one lap, one sunrise, one pass over a city. Below is a real example running on the International Space Station, live.</p>
+    <p class="lede rv d2">A coin on orbt carries a rulebook: up to six lines of <b>when its satellite does something → the coin does something</b>. The engine computes the satellite’s position from its latest element set every few minutes and fires a rule once per real event: one lap, one sunrise, one pass over a city. Below is a real example running live. Switch satellites to see the same rulebook on a different orbit.</p>
     <div class="rf">
-      <div class="con dark rv"><div class="ct" style="color:#8fb3a8">rulebook · example on ISS (ZARYA) · NORAD 25544<span class="r" style="color:#6f8a83">live readings</span></div>
+      <div class="con dark rv"><div class="ct" style="color:#8fb3a8">rulebook · example on <span id="bookSat" style="color:#e8f1ed">ISS (ZARYA)</span><span class="r" style="color:#6f8a83">live readings</span></div>
+        <div class="chips" id="bookPick" style="margin:-2px 0 12px"></div>
         <div class="code" id="book"></div></div>
       <div class="con rv d1"><div class="ct">lap counter<span class="r" id="lapMeta"></span></div><canvas id="lap"></canvas></div>
-      <div class="con rv" style="grid-column:1/-1"><div class="ct">what this rulebook would have fired in the last 6 hours<span class="r">computed from the ISS’s real orbit; nothing was spent</span></div><div class="log" id="flog"></div></div>
+      <div class="con rv" style="grid-column:1/-1"><div class="ct">what this rulebook would have fired in the last 6 hours<span class="r">computed from the real orbit; nothing was spent</span></div><div class="log" id="flog"></div></div>
     </div>
     <div class="sensors">
       <div class="sensor rv"><pre>  .-""-.
@@ -131,7 +143,7 @@
 
 <section class="sec" id="coins">
   <div class="wrap">
-    <div class="hd rv"><span class="no">[05]</span><span>coins in orbit</span><span class="rule"></span><span class="meta" id="coinMeta"></span></div>
+    <div class="hd rv"><span class="no">[06]</span><span>coins in orbit</span><span class="rule"></span><span class="meta" id="coinMeta"></span></div>
     <h2 class="t rv d1">The satellites that <em>already have a coin.</em></h2>
     <div class="coins" id="coinGrid"><div class="empty" style="grid-column:1/-1">Reading the records…</div></div>
   </div>
@@ -139,7 +151,7 @@
 
 <section class="sec fall" id="falling">
   <div class="wrap">
-    <div class="hd rv"><span class="no">[06]</span><span>falling</span><span class="rule"></span><span class="meta">the lowest active satellites, live</span></div>
+    <div class="hd rv"><span class="no">[07]</span><span>falling</span><span class="rule"></span><span class="meta">the lowest active satellites, live</span></div>
     <h2 class="t rv d1">Some of them are <em>coming down.</em></h2>
     <p class="lede rv d2">Air drag pulls low satellites a little lower every day until they burn up. These are the active satellites with the lowest perigee right now, from the public catalogue. Lower than about 200 km, the end is usually weeks away. A coin with a re-entry rule turns that moment into its last payout.</p>
     <div class="con rv" style="margin-top:24px"><div class="ct">lowest perigee first<span class="r" id="fallMeta"></span></div><div id="fall"><div class="empty">Reading the catalogue…</div></div></div>
@@ -148,7 +160,7 @@
 
 <section class="sec" id="engine">
   <div class="wrap">
-    <div class="hd rv"><span class="no">[07]</span><span>the engine</span><span class="rule"></span><span class="meta" id="beatMeta"></span></div>
+    <div class="hd rv"><span class="no">[08]</span><span>the engine</span><span class="rule"></span><span class="meta" id="beatMeta"></span></div>
     <h2 class="t rv d1">One wallet per coin. <em>Every action public.</em></h2>
     <p class="lede rv d2">The engine is custodial, and says so. Each coin gets its own wallet, derived on the server from one master secret, and that wallet is the coin’s pump.fun creator. The engine claims the creator fees into it, reads the satellite, and when a rule fires it spends exactly what the rulebook says. Every action is a Solana transaction linked from the coin’s page.</p>
     <div class="spec rv">
@@ -164,7 +176,7 @@
 
 <section class="sec faq" id="faq">
   <div class="wrap">
-    <div class="hd rv"><span class="no">[08]</span><span>questions</span><span class="rule"></span></div>
+    <div class="hd rv"><span class="no">[09]</span><span>questions</span><span class="rule"></span></div>
     <h2 class="t rv d1">Straight <em>answers.</em></h2>
     <div class="rv d2" style="margin-top:20px">
       <details><summary>Are these real satellites?</summary><p>Yes. Every dot is an active satellite from CelesTrak’s public catalogue of element sets, the same data amateur trackers and many operators use. Positions are computed with SGP4, the propagator those elements are made for. Altitude on the globe is compressed so everything fits on one screen.</p></details>
