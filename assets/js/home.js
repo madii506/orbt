@@ -29,7 +29,7 @@
   }
   // search
   const q = $('#q'), res = $('#res');
-  q.oninput = () => {
+  if (q) q.oninput = () => {
     const v = q.value.trim().toLowerCase(); if (!v || !CAT) { res.classList.remove('on'); return; }
     const hits = CAT.sats.filter(s => s.name.toLowerCase().includes(v) || String(s.norad) === v).sort((a, b) => (b.tag === 'station') - (a.tag === 'station') || b.bright - a.bright || a.name.length - b.name.length).slice(0, 12);
     res.innerHTML = hits.length ? hits.map(s => `<a href="#" data-i="${s.i}">${esc(s.name)}<span>${s.norad}</span></a>`).join('') : '<div class="empty">No active satellite by that name.</div>';
@@ -39,13 +39,13 @@
   const card = $('#card');
   function focus(i, fly, auto) {
     focusI = i; globe.focus = i; const s = CAT.sats[i]; if (!s) return; if (!auto) idle = performance.now();
-    $('#quick').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.n === s.norad));
+    const qk = $('#quick'); if (qk) qk.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.n === s.norad));
     const p = ORB.at(OB.rec(s), new Date()); if (fly && p) globe.lookAt(p.lat, p.lon);
     globe.focusLock = true; clearTimeout(focus._t); focus._t = setTimeout(() => { globe.focusLock = false; }, 9000);
-    drawCard(); card.classList.add('on');
+    if (!auto) { card.classList.add('on'); drawCard(); } else if (!card.classList.contains('on')) card.innerHTML = '';
   }
   function drawCard() {
-    if (focusI == null || !CAT) return; const s = CAT.sats[focusI], r = OB.rec(s), now = new Date(), p = ORB.at(r, now); if (!p) return;
+    if (focusI == null || !CAT || !card.classList.contains('on') && card.innerHTML === '') return; const s = CAT.sats[focusI], r = OB.rec(s), now = new Date(), p = ORB.at(r, now); if (!p) return;
     const sh = ORB.shape(r), lit = ORB.lit(p.eci, now), nx = ORB.nextOrbit(r, now), coin = COINS.taken.get(s.norad);
     const ageH = (Date.now() - r.epochMs) / 36e5;
     card.innerHTML = `<h3>${esc(s.name)}</h3><div class="sub">NORAD ${s.norad} · ${OB.TAGS[s.tag][0]} · elements ${ageH < 48 ? ageH.toFixed(1) + ' h' : Math.round(ageH / 24) + ' d'} old</div>
@@ -71,6 +71,7 @@
     quick(); types(by); pairing();
   }
   function quick() {
+    if (!$('#quick')) return;
     const Q = [[25544, 'ISS'], [48274, 'Tiangong'], [20580, 'Hubble'], [33591, 'NOAA 19'], [49260, 'Landsat 9'], [41866, 'GOES-16']].filter(([n]) => CAT.by.has(n));
     $('#quick').innerHTML = Q.map(([n, t]) => `<button type="button" data-n="${n}">${t}</button>`).join('');
     $('#quick').querySelectorAll('button').forEach(b => b.onclick = () => { stopTour(); focus(CAT.by.get(+b.dataset.n).i, true); });
