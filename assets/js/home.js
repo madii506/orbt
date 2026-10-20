@@ -332,13 +332,13 @@
   }
 
   // ---------- 03 the catalogue ----------
-  let csort = 'vis', ctag = null, cq = '', copen = false, cshow = 60;
+  let csort = 'vis', ctag = null, cq = '', copen = false, cshow = 24;
   function catalogue() {
     const by = {}; CAT.sats.forEach(s => by[s.tag] = (by[s.tag] || 0) + 1);
     $('#ctags').innerHTML = Object.entries(OB.TAGS).filter(([k]) => by[k]).map(([k, [nm]]) => `<button class="chip" data-t="${k}" type="button">${nm}</button>`).join('');
     $('#ctags').querySelectorAll('.chip').forEach(b => b.onclick = () => { const on = !b.classList.contains('on'); $('#ctags').querySelectorAll('.chip').forEach(x => x.classList.remove('on')); if (on) b.classList.add('on'); ctag = on ? b.dataset.t : null; cshow = 60; ctable(); });
     $('#csort').querySelectorAll('.chip').forEach(b => b.onclick = () => { $('#csort').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); csort = b.dataset.s; cshow = 60; ctable(); });
-    let h; $('#cq').oninput = e => { clearTimeout(h); h = setTimeout(() => { cq = e.target.value.trim().toLowerCase(); cshow = 60; ctable(); }, 150); };
+    let h; $('#cq').oninput = e => { clearTimeout(h); h = setTimeout(() => { cq = e.target.value.trim().toLowerCase(); cshow = 24; ctable(); }, 150); };
     $('#copen').onchange = e => { copen = e.target.checked; ctable(); };
     ctable(); setInterval(() => { if (!document.hidden) liveAlt(); }, 3000);
   }
@@ -407,7 +407,7 @@
       for (let a = 0; a < 1; a += .006) { const ang = a * Math.PI * 2 - Math.PI / 2, px = X + Math.cos(ang) * rx, py = Y + Math.sin(ang) * ry; const behind = Math.sin(ang) < 0 && Math.abs(px - X) < R; if (behind) continue; x.fillStyle = a <= ph ? 'rgba(40,110,214,.9)' : 'rgba(29,57,52,.3)'; x.fillRect(px - 1, py - 1, 2, 2); }
       const ang = ph * Math.PI * 2 - Math.PI / 2, sx = X + Math.cos(ang) * rx, sy = Y + Math.sin(ang) * ry;
       x.font = '800 15px JBM, monospace'; x.fillStyle = '#1d3934'; x.fillText('=[]=', sx, sy);
-      x.font = '11px JBM, monospace'; x.fillStyle = 'rgba(29,57,52,.6)'; x.fillText('lap start · ascending node', X, Y - ry - 14); x.fillText('|', X, Y - ry - 3);
+      x.font = '11px JBM, monospace'; x.fillStyle = 'rgba(29,57,52,.6)'; x.fillText('lap start · ascending node', X, Y - R - 16); x.fillStyle = 'rgba(29,57,52,.35)'; for (let yy = Y - R - 6; yy < Y - ry - 4; yy += 4) x.fillRect(X - .5, yy, 1, 2);
       x.fillStyle = '#286ed6'; x.font = '700 12px JBM, monospace'; x.fillText(`${(ph * 100).toFixed(2)}%  ·  next fire in ${OB.dur(ORB.nextOrbit(r, now) - now)}`, X, H - 16);
     };
     requestAnimationFrame(draw);
