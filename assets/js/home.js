@@ -6,9 +6,19 @@
 
   // ---------- 01 the sky ----------
   const tip = $('#tip');
-  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .58, cy: mob ? .5 : .53, r: mob ? .4 : .34, lon: -40, lat: 22, spin: 2.4, font: 12,
-    onPick: i => focus(i, true),
-    onHover: (i, mx, my) => { if (i == null || !CAT) { tip.classList.remove('on'); return; } const s = CAT.sats[i]; tip.textContent = `${s.name} · ${s.norad}`; tip.style.left = mx + 'px'; tip.style.top = my + 'px'; tip.classList.add('on'); } });
+  let idle = performance.now();
+  globe = new SKY.Globe($('#globe'), { cx: mob ? .5 : .55, cy: mob ? .5 : .54, r: mob ? .38 : .34, lon: -40, lat: 22, spin: 2.4, font: 12,
+    onPick: i => { focus(i, true); stopTour(); },
+    onHover: i => { if (i != null) idle = performance.now(); } });
+  $('#globe').addEventListener('pointerdown', () => { idle = performance.now(); });
+  $('#zIn').onclick = () => globe.setZoom((globe.zt || globe.zoom) * 1.25); $('#zOut').onclick = () => globe.setZoom((globe.zt || globe.zoom) / 1.25);
+  // the tour: when nobody is touching the globe, it flies from one notable satellite to the next
+  const TOUR = [25544, 48274, 20580, 33591, 49260, 43013, 41866, 39084, 27424, 40697, 25994, 28654];
+  let tourOn = !mob, tourK = 0, tourT = 0;
+  const stopTour = () => { tourOn = false; $('#zTour').classList.remove('on'); };
+  $('#zTour').onclick = () => { tourOn = !tourOn; $('#zTour').classList.toggle('on', tourOn); tourT = 0; };
+  setInterval(() => { if (!tourOn || !CAT || document.hidden) return; const now = performance.now(); if (now - idle < 9000 || now - tourT < 8500) return;
+    const list = TOUR.filter(n => CAT.by.has(n)); if (!list.length) return; const s = CAT.by.get(list[tourK++ % list.length]); tourT = now; focus(s.i, true, true); }, 1000);
   const tagsEl = $('#tags'); let filter = null;
   function chips(by) {
     tagsEl.innerHTML = Object.entries(OB.TAGS).filter(([k]) => by[k]).map(([k, [nm, col]]) => `<button class="chip" data-t="${k}" type="button"><i style="background:${col}"></i>${nm} <span class="dim">${OB.num(by[k])}</span></button>`).join('');
@@ -26,8 +36,9 @@
   };
   // the focus card, updated every second from the real orbit
   const card = $('#card');
-  function focus(i, fly) {
-    focusI = i; globe.focus = i; const s = CAT.sats[i]; if (!s) return;
+  function focus(i, fly, auto) {
+    focusI = i; globe.focus = i; const s = CAT.sats[i]; if (!s) return; if (!auto) idle = performance.now();
+    $('#quick').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.n === s.norad));
     const p = ORB.at(OB.rec(s), new Date()); if (fly && p) globe.lookAt(p.lat, p.lon);
     globe.focusLock = true; clearTimeout(focus._t); focus._t = setTimeout(() => { globe.focusLock = false; }, 9000);
     drawCard(); card.classList.add('on');
@@ -55,7 +66,24 @@
     $('#catMeta').textContent = `${OB.num(CAT.count)} active · elements ${OB.ago(CAT.at)}`;
     COINS = await OB.coins(); drawCard();
     tape(by); catalogue(); rulesDemo(); coinsGrid(); falling(); overheadInit();
-    const iss = CAT.by.get(25544); if (iss && !mob) setTimeout(() => { if (focusI == null) focus(iss.i, false); }, 2600);
+    const iss = CAT.by.get(25544); if (iss && !mob) setTimeout(() => { if (focusI == null) focus(iss.i, false, true); }, 2600);
+    quick(); types(by);
+  }
+  function quick() {
+    const Q = [[25544, 'ISS'], [48274, 'Tiangong'], [20580, 'Hubble'], [33591, 'NOAA 19'], [49260, 'Landsat 9'], [41866, 'GOES-16']].filter(([n]) => CAT.by.has(n));
+    $('#quick').innerHTML = Q.map(([n, t]) => `<button type="button" data-n="${n}">${t}</button>`).join('');
+    $('#quick').querySelectorAll('button').forEach(b => b.onclick = () => { stopTour(); focus(CAT.by.get(+b.dataset.n).i, true); });
+  }
+  // the sky by type: ASCII bars that fill when they come into view; a row lights its group up on the globe
+  function types(by) {
+    const tot = CAT.count, rows = Object.entries(by).sort((a, b) => b[1] - a[1]), max = rows[0][1];
+    $('#typeMeta').textContent = `${OB.num(tot)} active · elements ${OB.ago(CAT.at)}`;
+    const box = $('#typeBars'); box.innerHTML = rows.map(([k, n]) => `<div class="ty" data-t="${k}"><span class="nm"><i style="background:${OB.TAGS[k][1]}"></i>${OB.TAGS[k][0]}</span><span class="bars" data-n="${n}"></span><span class="n" data-v="${n}">0</span><span class="p">${(n / tot * 100).toFixed(1)}%</span></div>`).join('');
+    const W = () => Math.max(10, Math.floor((box.querySelector('.bars').clientWidth || 400) / 7.2));
+    const fill = () => { const w = W(); box.querySelectorAll('.ty').forEach((r, j) => { const n = +r.querySelector('.bars').dataset.n, full = Math.max(1, Math.round(n / max * w)); const t0 = performance.now() + j * 90;
+      const step = t => { const k = Math.max(0, Math.min(1, (t - t0) / 1100)), e = 1 - Math.pow(1 - k, 3), m = Math.round(full * e); r.querySelector('.bars').innerHTML = '#'.repeat(m) + '<span>' + '.'.repeat(Math.max(0, w - m)) + '</span>'; r.querySelector('.n').textContent = OB.num(n * e); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); }); };
+    new IntersectionObserver((es, io) => { if (es[0].isIntersecting) { fill(); io.disconnect(); } }, { threshold: .3 }).observe(box);
+    box.querySelectorAll('.ty').forEach(r => r.onclick = () => { const t = r.dataset.t; tagsEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.t === t)); filter = new Set([t]); globe.filter = filter; stopTour(); $('#sky').scrollIntoView({ behavior: 'smooth' }); });
   }
   // the ticker: real counts and real positions
   function tape(by) {
@@ -172,16 +200,22 @@
         <span class="go">${c ? `<a class="tag live" href="/sat?n=${s.norad}">$${esc(c.symbol)}</a>` : `<a class="btn s o" href="/launch?n=${s.norad}">launch →</a>`}</span></div>`; }).join('')
       + (total > cshow ? `<div class="more"><button class="btn s o" id="cmore" type="button">show more · ${OB.num(total - cshow)} left</button></div>` : '') + (!total ? '<div class="empty">Nothing matches.</div>' : '');
     const m = $('#cmore'); if (m) m.onclick = () => { cshow += 60; ctable(); };
+    $('#ctab').querySelectorAll('.r[data-n]').forEach(r => r.onclick = e => { if (e.target.closest('a')) return; const s = CAT.by.get(+r.dataset.n); if (!s) return; stopTour(); focus(s.i, true); $('#sky').scrollIntoView({ behavior: 'smooth' }); });
   }
   function liveAlt() { if (!POS) return; $('#ctab').querySelectorAll('.r[data-n]').forEach(r => { const s = CAT.by.get(+r.dataset.n); const a = s && altOf(s); const el = r.querySelector('.al'); if (el && a != null) el.textContent = OB.num(a) + ' km'; }); }
 
   // ---------- 04 a rulebook running on the ISS ----------
-  function rulesDemo() {
-    const iss = CAT.by.get(25544); if (!iss) { $('#book').textContent = 'The ISS is not in the catalogue right now.'; return; }
+  let demoT = null;
+  function rulesDemo(norad) {
+    const DEMO = [[25544, 'ISS'], [48274, 'Tiangong'], [20580, 'Hubble'], [33591, 'NOAA 19']].filter(([n]) => CAT.by.has(n));
+    norad = norad || (DEMO[0] && DEMO[0][0]); const iss = CAT.by.get(norad); if (!iss) { $('#book').textContent = 'The example satellite is not in the catalogue right now.'; return; }
+    $('#bookPick').innerHTML = DEMO.map(([n, t]) => `<button class="chip ${n === norad ? 'on' : ''}" type="button" data-n="${n}" style="border-color:#2a3f3a;color:${n === norad ? '#0f1f1c' : '#cfe0da'};background:${n === norad ? '#cfe0da' : 'transparent'}">${t}</button>`).join('');
+    $('#bookPick').querySelectorAll('button').forEach(b => b.onclick = () => rulesDemo(+b.dataset.n));
+    $('#bookSat').textContent = iss.name; clearInterval(demoT);
     const r = OB.rec(iss), NY = { name: 'New York', lat: 40.713, lon: -74.006 };
     const book = () => {
       const now = new Date(), p = ORB.at(r, now), lit = p && ORB.lit(p.eci, now), nx = ORB.nextOrbit(r, now), ns = ORB.nextCrossing(r, now, true), np = ORB.passes(r, NY, now, 36, 20, 1)[0];
-      $('#book').innerHTML = `<span class="c"># ISS (ZARYA) · NORAD 25544 · example rulebook</span>
+      $('#book').innerHTML = `<span class="c"># ${esc(iss.name)} · NORAD ${iss.norad} · example rulebook</span>
 <span class="k">01</span>  when <span class="s">sat.orbit.complete</span>            -> <span class="a">buyback_burn(5% chest)</span>
     <span class="c"># orbit #${OB.num(ORB.orbitNo(r, now))} · next lap in ${OB.dur(nx - now)}</span>
 <span class="k">02</span>  when <span class="s">sat.sunrise</span>                   -> <span class="a">buyback_burn(8% chest)</span>
@@ -192,7 +226,7 @@
     <span class="c"># altitude ${p ? Math.round(p.alt) : '—'} km · still flying</span>`;
       $('#lapMeta').textContent = `orbit #${OB.num(ORB.orbitNo(r, now))} · ${(ORB.orbitPhase(r, now) * 100).toFixed(1)}% of the lap`;
     };
-    book(); setInterval(book, 1000);
+    book(); demoT = setInterval(book, 1000);
     // what it would have fired: real laps, real sunrises, real passes over New York, last 6 hours
     const now = new Date(), from = new Date(now - 6 * 36e5), ev = [];
     const per = ORB.periodMin(r); for (let t = ORB.nextOrbit(r, from); t < now; t = new Date(t.getTime() + per * 6e4)) ev.push([t, `orbit #${OB.num(ORB.orbitNo(r, new Date(t.getTime() + 5e3)))} complete`, 'buyback_burn(5% chest)']);
@@ -200,13 +234,14 @@
     ORB.passes(r, NY, from, 6, 20).forEach(p => ev.push([p.rise, `pass over New York, ${Math.round(p.maxEl)}° high`, 'airdrop_holders(20% chest)']));
     ev.sort((a, b) => b[0] - a[0]);
     $('#flog').innerHTML = ev.map(([t, w, a]) => `<div><span class="dim">${t.toISOString().slice(11, 19)} UTC</span>  ${esc(w)}  <span class="acc">→ ${a}</span></div>`).join('') || '<div class="dim">Nothing in the last 6 hours.</div>';
-    lap(r);
+    lapR = r; if (!lapOn) { lapOn = true; lap(); }
   }
-  function lap(r) {
+  let lapR = null, lapOn = false;
+  function lap() {
     const c = $('#lap'), x = c.getContext('2d'); let W, H; const fit = () => { const d = Math.min(2, devicePixelRatio || 1); W = c.clientWidth; H = c.clientHeight; c.width = W * d; c.height = H * d; x.setTransform(d, 0, 0, d, 0, 0); }; fit(); addEventListener('resize', fit);
     let vis = true; new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(c);
     const draw = () => {
-      requestAnimationFrame(draw); if (!vis || document.hidden) return; const now = new Date(), ph = ORB.orbitPhase(r, now), p = ORB.at(r, now); x.clearRect(0, 0, W, H);
+      requestAnimationFrame(draw); if (!vis || document.hidden) return; const r = lapR, now = new Date(), ph = ORB.orbitPhase(r, now), p = ORB.at(r, now); x.clearRect(0, 0, W, H);
       const X = W / 2, Y = H / 2 + 6, rx = Math.min(W * .42, 230), ry = rx * .38;
       x.font = '12px JBM, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
       // the planet as characters

@@ -93,5 +93,7 @@
     requestAnimationFrame(draw);
   };
 
+  // consoles light up under the pointer
+  document.addEventListener('pointermove', e => { const c = e.target.closest && e.target.closest('.con:not(.dark)'); if (O._lit && O._lit !== c) O._lit.classList.remove('lit'); if (!c) { O._lit = null; return; } const b = c.getBoundingClientRect(); c.style.setProperty('--mx', (e.clientX - b.left) + 'px'); c.style.setProperty('--my', (e.clientY - b.top) + 'px'); c.classList.add('lit'); O._lit = c; }, { passive: true });
   document.addEventListener('DOMContentLoaded', () => { O.reveals(); O.spy(); O.bar(); O.ambient(); });
 })();
