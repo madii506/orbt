@@ -13,7 +13,7 @@
       let sc = null; try { sc = (await OB.api('sky?op=sat&n=' + n)).satcat; } catch (e) {}
       return fail(`NORAD ${n} isn’t in the active catalogue.`, sc && sc.decay ? `It re-entered on ${esc(sc.decay)}.` : 'It may have re-entered, or it may never have been an active satellite. <a class="acc" href="/#catalogue">Back to the catalogue</a>.');
     }
-    R = OB.rec(S); document.title = 'orbt · ' + S.name;
+    R = OB.rec(S); document.title = 'orbt';
     $('#sn').textContent = S.name; OB.decode($('#sn'), 900);
     const ageH = (Date.now() - R.epochMs) / 36e5;
     $('#sk').textContent = `NORAD ${S.norad} · ${OB.TAGS[S.tag][0]} · elements ${ageH < 48 ? ageH.toFixed(1) + ' h' : Math.round(ageH / 24) + ' d'} old`;
