@@ -5,7 +5,8 @@
     "api/tick.js": { "maxDuration": 60, "includeFiles": "assets/js/{rules,orb}.js" },
     "api/sky.js": { "maxDuration": 60, "includeFiles": "assets/js/{rules,orb}.js" },
     "api/coins.js": { "maxDuration": 25, "includeFiles": "assets/js/{rules,orb}.js" },
-    "api/meta.js": { "maxDuration": 15 }
+    "api/meta.js": { "maxDuration": 15 },
+    "api/pair.js": { "maxDuration": 25, "includeFiles": "assets/js/{rules,orb}.js" }
   },
   "crons": [
     { "path": "/api/tick", "schedule": "*/2 * * * *" },
