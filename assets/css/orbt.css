@@ -230,9 +230,13 @@ html.booting #intro{display:block}
 #intro canvas{position:absolute;inset:0;width:100%;height:100%}
 #intro .bbar{position:absolute;left:50%;bottom:8vh;width:min(320px,60vw);height:2px;transform:translateX(-50%);background:var(--line);overflow:hidden}
 #intro .bbar i{display:block;height:100%;background:var(--acc);transform:scaleX(0);transform-origin:left}
+#intro .hint{position:absolute;left:0;right:0;bottom:calc(8vh + 16px);text-align:center;font-size:11.5px;color:var(--ink2);letter-spacing:.06em;pointer-events:none;animation:hintIn 1s var(--ease) 1.4s both}
+@keyframes hintIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#intro.engaged .bskip{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 #intro .bskip{position:absolute;right:22px;bottom:18px;font-size:11px;color:var(--ink2);letter-spacing:.04em;cursor:pointer;padding:6px 10px;border:1px solid var(--line2);background:var(--paper);transition:all .2s}
 #intro .bskip:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-#intro{cursor:crosshair}
+#intro{cursor:grab}
+#intro:active{cursor:grabbing}
 #intro.out{opacity:0;pointer-events:none}
 html.booting body{overflow:hidden}
 html.booting .bar{transform:translateY(-100%)}
