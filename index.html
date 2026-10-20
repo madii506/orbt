@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>orbt · every satellite in orbit is a coin</title>
+<meta name="description" content="Launch a pump.fun coin on any satellite in orbit. Tracked live from public orbital data, with rules that fire on real orbits, passes, sunrises and re-entries.">
+<meta property="og:title" content="orbt">
+<meta property="og:description" content="Every satellite in orbit is a coin. Tracked live. Rules fire on real orbits, passes and re-entries.">
+<meta property="og:image" content="/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f6f3ec">
+<link rel="icon" href="/assets/img/fav64.png" type="image/png">
+<link rel="apple-touch-icon" href="/assets/img/fav180.png">
+<link rel="preload" href="/assets/fonts/JBM-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/JBM-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/orbt.css?v=1">
+<script>window.__cat = fetch('/api/sky?op=catalog').catch(() => null);</script>
+</head>
+<body class="lock">
+<div id="intro">
+  <canvas aria-hidden="true"></canvas>
+  <button class="skip" type="button">SKIP ›</button>
+  <div class="term" aria-live="polite"></div>
+  <div class="cnt"></div>
+  <button class="enter" type="button">[ ENTER ORBIT ]</button>
+</div>
+<canvas id="amb" aria-hidden="true"></canvas>
+
+<header class="bar">
+  <a class="logo" href="/">orbt<i>_</i></a>
+  <span class="seg"><span class="live"></span>UTC <b id="utc">--:--:--</b></span>
+  <span class="seg"><b id="nobj">…</b> objects tracked</span>
+  <span class="seg opt" id="issnow">ISS …</span>
+  <span class="seg opt">elements <b id="catage">…</b></span>
+  <span class="sp"></span>
+  <nav class="nav"><a href="#sky">sky</a><a href="#overhead" class="opt">overhead</a><a href="#catalogue">catalogue</a><a href="#rules" class="opt">rules</a><a href="#coins" class="opt">coins</a><a href="#engine" class="opt">engine</a></nav>
+  <a class="cta" href="/launch">launch ↗</a>
+</header>
+<aside class="rail" aria-hidden="true">
+  <a href="#sky">01</a><a href="#overhead">02</a><a href="#catalogue">03</a><a href="#rules">04</a><a href="#coins">05</a><a href="#falling">06</a><a href="#engine">07</a><a href="#faq">08</a>
+  <span class="alt">ORBT · GROUND STATION</span>
+</aside>
+
+<main>
+<section class="sky" id="sky">
+  <canvas id="globe" aria-label="Live globe with every active satellite"></canvas>
+  <div class="tip" id="tip"></div>
+  <div class="ov tl">
+    <div class="k"><span class="live"></span>live · <span id="hcount">…</span> satellites · positions every second</div>
+    <h1>Every satellite<br>in orbit is <em>a coin.</em></h1>
+    <p>Real satellites, tracked live from public orbital data. Pick one, launch its coin on pump.fun and wire it to its orbit: every lap, every sunrise, every pass over a city can fire a buyback. When it falls back to Earth, the holders get the chest.</p>
+    <div class="row"><a class="btn" href="/launch">launch a coin ↗</a><a class="btn o" href="#catalogue">browse the catalogue</a></div>
+  </div>
+  <div class="ov tr">
+    <div class="find"><input class="inp" id="q" placeholder="find a satellite: name or NORAD id" autocomplete="off" spellcheck="false" aria-label="Find a satellite"></div>
+    <div class="res" id="res"></div>
+    <div class="card" id="card"></div>
+  </div>
+  <div class="ov bl">
+    <div class="chips" id="tags"></div>
+    <div class="hint">drag to turn the planet · click a dot to follow it · dim dots are in Earth’s shadow</div>
+  </div>
+  <div class="scale">altitude compressed: low orbit hugs the planet,<br>navigation shells float above, the geostationary ring sits outside</div>
+</section>
+
+<div class="tape"><div class="in" id="tape"></div></div>
+
+<section class="sec" id="overhead">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[02]</span><span>overhead now</span><span class="rule"></span><span class="meta" id="ohMeta">your sky, computed in your browser</span></div>
+    <h2 class="t rv d1">What’s over <em>your head</em> right now.</h2>
+    <p class="lede rv d2">Every satellite above your horizon this second, where to look (compass direction and height), and which ones you could see with your own eyes: lit by the sun while your sky is dark. Your location never leaves your browser.</p>
+    <div class="where rv d2"><button class="btn s" id="locBtn" type="button">use my location</button><span class="dim">or</span><input class="inp" id="cityQ" placeholder="search a city" autocomplete="off"><div class="res" id="cityRes" style="position:absolute;z-index:5"></div><span class="dim" id="here"></span></div>
+    <div class="cols">
+      <div class="con c5 rv"><div class="ct">sky dome<span class="r" id="domeN"></span></div><canvas id="dome"></canvas></div>
+      <div class="con c7 rv d1"><div class="ct">above you<span class="r">sorted by height in the sky</span></div><div class="olist" id="olist"><div class="empty">Pick a place to see its sky.</div></div></div>
+      <div class="con c12 rv"><div class="ct">next passes · 24 hours<span class="r" id="passMeta"></span></div><div id="passes"><div class="empty">Pick a place to see the next passes of the space stations and the brightest satellites.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec cat" id="catalogue">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[03]</span><span>the catalogue</span><span class="rule"></span><span class="meta" id="catMeta">CelesTrak public element sets</span></div>
+    <h2 class="t rv d1">Every one of them <em>can be launched.</em></h2>
+    <p class="lede rv d2">One coin per satellite. The first launch takes it, and nobody can launch a second coin on the same satellite. Altitudes below are live, recomputed from each satellite’s orbit every few seconds.</p>
+    <div class="con rv" style="margin-top:26px">
+      <div class="bar2"><input class="inp" id="cq" placeholder="search: name or NORAD id" autocomplete="off"><div class="chips" id="ctags"></div>
+        <div class="chips" id="csort"><button class="chip on" data-s="vis" type="button">notable first</button><button class="chip" data-s="alt" type="button">lowest</button><button class="chip" data-s="new" type="button">newest</button><button class="chip" data-s="name" type="button">a–z</button></div>
+        <label class="chip" style="cursor:pointer"><input type="checkbox" id="copen" style="accent-color:var(--acc)"> open only</label></div>
+      <div class="ctab" id="ctab"><div class="empty">Loading the catalogue…</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="rules">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[04]</span><span>how a rule fires</span><span class="rule"></span><span class="meta">computed from the real orbit, every engine tick</span></div>
+    <h2 class="t rv d1">When it moves, <em>your coin moves.</em></h2>
+    <p class="lede rv d2">A coin on orbt carries a rulebook: up to six lines of <b>when its satellite does something → the coin does something</b>. The engine computes the satellite’s position from its latest element set every few minutes and fires a rule once per real event: one lap, one sunrise, one pass over a city. Below is a real example running on the International Space Station, live.</p>
+    <div class="rf">
+      <div class="con dark rv"><div class="ct" style="color:#8fb3a8">rulebook · example on ISS (ZARYA) · NORAD 25544<span class="r" style="color:#6f8a83">live readings</span></div>
+        <div class="code" id="book"></div></div>
+      <div class="con rv d1"><div class="ct">lap counter<span class="r" id="lapMeta"></span></div><canvas id="lap"></canvas></div>
+      <div class="con rv" style="grid-column:1/-1"><div class="ct">what this rulebook would have fired in the last 6 hours<span class="r">computed from the ISS’s real orbit; nothing was spent</span></div><div class="log" id="flog"></div></div>
+    </div>
+    <div class="sensors">
+      <div class="sensor rv"><pre>  .-""-.
+ /  ()  \   ← lap 1
+ \      /
+  '-..-'</pre><b>orbits</b><p>Fires every N completed laps. A low satellite laps the planet about every 90 minutes; a navigation satellite twice a day.</p><code>sat.orbits % N == 0</code></div>
+      <div class="sensor rv d1"><pre>     =[]=
+      \ 34°
+ ______\_____ NYC</pre><b>passes</b><p>Fires when it crosses a city’s sky above a height you choose. Computed from the city’s coordinates and the satellite’s look angles.</p><code>sat.passes("New York", el > 20°)</code></div>
+      <div class="sensor rv d2"><pre> ( sun )  →→→  =[]=
+   ######  shadow
+   ######</pre><b>sunlight</b><p>Fires as it flies out of Earth’s shadow into sunlight, or back in. Low satellites see about 16 sunrises a day.</p><code>sat.sunrise · sat.sunset</code></div>
+      <div class="sensor rv"><pre>  ##
+  ## ##
+  ## ## ##  km</pre><b>altitude</b><p>Fires when it drops below (or climbs above) a height. Air drag pulls low satellites down month by month.</p><code>sat.alt &lt; 300km</code></div>
+      <div class="sensor rv d1"><pre>   =[]=
+     \\
+      \\ ~ ~ ~ ~</pre><b>re-entry</b><p>Fires once, when the satellite comes down and the public catalogue records its decay. The natural last rule: hand the chest to the holders.</p><code>sat.reenters</code></div>
+      <div class="sensor rv d2"><pre>  $ ....../
+  $ ...../
+  $ ..../</pre><b>the coin and the clock</b><p>Market-cap levels, graduation from pump.fun, and plain intervals, for rulebooks that also watch the coin itself.</p><code>coin.mcap &gt;= $100K · every(6h)</code></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="coins">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[05]</span><span>coins in orbit</span><span class="rule"></span><span class="meta" id="coinMeta"></span></div>
+    <h2 class="t rv d1">The satellites that <em>already have a coin.</em></h2>
+    <div class="coins" id="coinGrid"><div class="empty" style="grid-column:1/-1">Reading the records…</div></div>
+  </div>
+</section>
+
+<section class="sec fall" id="falling">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[06]</span><span>falling</span><span class="rule"></span><span class="meta">the lowest active satellites, live</span></div>
+    <h2 class="t rv d1">Some of them are <em>coming down.</em></h2>
+    <p class="lede rv d2">Air drag pulls low satellites a little lower every day until they burn up. These are the active satellites with the lowest perigee right now, from the public catalogue. Lower than about 200 km, the end is usually weeks away. A coin with a re-entry rule turns that moment into its last payout.</p>
+    <div class="con rv" style="margin-top:24px"><div class="ct">lowest perigee first<span class="r" id="fallMeta"></span></div><div id="fall"><div class="empty">Reading the catalogue…</div></div></div>
+  </div>
+</section>
+
+<section class="sec" id="engine">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[07]</span><span>the engine</span><span class="rule"></span><span class="meta" id="beatMeta"></span></div>
+    <h2 class="t rv d1">One wallet per coin. <em>Every action public.</em></h2>
+    <p class="lede rv d2">The engine is custodial, and says so. Each coin gets its own wallet, derived on the server from one master secret, and that wallet is the coin’s pump.fun creator. The engine claims the creator fees into it, reads the satellite, and when a rule fires it spends exactly what the rulebook says. Every action is a Solana transaction linked from the coin’s page.</p>
+    <div class="spec rv">
+      <div><h4>the engine does</h4><ul><li>launch the coin on pump.fun from your deposit</li><li>send your first buy and unused SOL back to you</li><li>claim creator fees into the coin’s chest</li><li>compute the satellite’s orbit from its latest elements</li><li>buy back and burn, airdrop or pay holders when a rule fires</li></ul></div>
+      <div class="no"><h4>the engine cannot</h4><ul><li>sell the coin (there is no sell action)</li><li>withdraw the chest to anyone not named in the rulebook</li><li>change a rulebook after launch (its fingerprint is in the coin’s description)</li><li>fire a rule twice for the same lap, pass or sunrise</li><li>guess: if the orbit can’t be computed, the rule waits</li></ul></div>
+      <div><h4>what it costs</h4><ul><li>pump.fun’s own fees, paid from your deposit</li><li>a 0.015 SOL reserve stays in the coin wallet for gas</li><li>orbt takes 5% of each fee claim, only when a studio wallet is set (<span id="feeOn">checking…</span>)</li></ul></div>
+      <div><h4>where the data comes from</h4><ul><li>orbits: CelesTrak public element sets, refreshed every 3 hours</li><li>positions: SGP4, the standard propagator for these elements</li><li>the sun: the astronomical almanac’s low-precision formula</li><li>markets: Dexscreener, then the pump.fun curve itself</li></ul></div>
+    </div>
+    <div class="beat rv" id="beat"><span>last engine pass <b id="bTick">…</b></span><span>coins in orbit <b id="bLive">…</b></span><span>rules fired <b id="bFires">…</b></span><span>fees claimed <b id="bClaim">…</b></span><button class="btn s o" id="selfBtn" type="button">run the engine self-test</button></div>
+    <div class="con dark rv" id="selfOut" style="margin-top:16px;display:none"><div class="code" id="selfCode"></div></div>
+  </div>
+</section>
+
+<section class="sec faq" id="faq">
+  <div class="wrap">
+    <div class="hd rv"><span class="no">[08]</span><span>questions</span><span class="rule"></span></div>
+    <h2 class="t rv d1">Straight <em>answers.</em></h2>
+    <div class="rv d2" style="margin-top:20px">
+      <details><summary>Are these real satellites?</summary><p>Yes. Every dot is an active satellite from CelesTrak’s public catalogue of element sets, the same data amateur trackers and many operators use. Positions are computed with SGP4, the propagator those elements are made for. Altitude on the globe is compressed so everything fits on one screen.</p></details>
+      <details><summary>How accurate is the tracking?</summary><p>For low satellites, typically within a few kilometres when the elements are fresh, drifting as they age. The catalogue refreshes every three hours, and each satellite page shows how old its element set is.</p></details>
+      <details><summary>What does a coin have to do with its satellite?</summary><p>The coin is named on its satellite and its rulebook watches that satellite’s real orbit. orbt has no link to the satellite’s owner or operator, and owning the coin doesn’t mean owning anything in space.</p></details>
+      <details><summary>Can two coins be launched on the same satellite?</summary><p>No. One coin per satellite, first come. A launch that is waiting for its deposit holds the satellite for 45 minutes, then lets it go.</p></details>
+      <details><summary>Who holds the coin’s fees?</summary><p>The coin’s own wallet, run by the engine. It is custodial and the page says so everywhere. The engine can only spend the chest the way the rulebook says: buy back and burn, airdrop to holders, pay holders in SOL, or pay the creator.</p></details>
+      <details><summary>What happens when the satellite re-enters?</summary><p>Once the public catalogue records its decay, re-entry rules fire, once. After that the satellite is gone from the sky and from the live globe, and the coin carries on as a coin.</p></details>
+    </div>
+  </div>
+</section>
+</main>
+
+<script src="/assets/js/satellite.min.js"></script>
+<script src="/assets/js/orb.js?v=1"></script>
+<script src="/assets/js/land.js"></script>
+<script src="/assets/js/rules.js?v=1"></script>
+<script src="/assets/js/core.js?v=1"></script>
+<script src="/assets/js/sky.js?v=1"></script>
+<script src="/assets/js/intro.js?v=1"></script>
+<script src="/assets/js/home.js?v=1"></script>
+</body>
+</html>

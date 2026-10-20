@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>orbt · launch a coin on a satellite</title>
+<meta name="description" content="Pick a satellite, name its coin, wire its rulebook to the real orbit, and launch it on pump.fun.">
+<meta property="og:image" content="/assets/img/og.png">
+<meta name="theme-color" content="#f6f3ec">
+<link rel="icon" href="/assets/img/fav64.png" type="image/png">
+<link rel="preload" href="/assets/fonts/JBM-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/orbt.css?v=1">
+<script>window.__cat = fetch('/api/sky?op=catalog').catch(() => null);</script>
+</head>
+<body>
+<canvas id="amb" aria-hidden="true"></canvas>
+<header class="bar">
+  <a class="logo" href="/">orbt<i>_</i></a>
+  <span class="seg"><span class="live"></span>UTC <b id="utc">--:--:--</b></span>
+  <span class="seg"><b id="nobj">…</b> objects tracked</span>
+  <span class="sp"></span>
+  <nav class="nav"><a href="/#sky">sky</a><a href="/#catalogue">catalogue</a><a href="/#rules" class="opt">rules</a><a href="/#engine" class="opt">engine</a></nav>
+  <button class="cta" id="wbtn" type="button" style="border:0;cursor:pointer">connect wallet</button>
+</header>
+<main>
+  <div class="wrap wiz">
+    <div class="shead"><div class="k">launch · one coin per satellite</div><h1>Put a coin <span class="acc">in orbit.</span></h1>
+      <p class="lede">Pick a satellite, name its coin, and wire its rulebook to the real orbit. The engine launches it on pump.fun from one deposit, sends your first buy back to you, and from then on fires the rules on every real lap, sunrise or pass.</p></div>
+    <div class="steps" id="steps"><button data-i="0" class="on" type="button"><small>01</small>satellite</button><button data-i="1" type="button"><small>02</small>coin</button><button data-i="2" type="button"><small>03</small>rulebook</button><button data-i="3" type="button"><small>04</small>launch</button></div>
+
+    <div class="pane on" data-p="0">
+      <div class="field"><label for="pq">find a satellite</label><input class="inp" id="pq" placeholder="name or NORAD id: ISS, HUBBLE, NOAA 19, 25544…" autocomplete="off"></div>
+      <div class="chips" id="ptags" style="margin-bottom:10px"></div>
+      <div class="pick" id="pick"><div class="empty">Loading the catalogue…</div></div>
+      <div class="con" id="chosen" style="margin-top:14px;display:none"></div>
+    </div>
+
+    <div class="pane" data-p="1">
+      <div class="two">
+        <div>
+          <div class="two"><div class="field"><label for="fName">name</label><input class="inp" id="fName" maxlength="32" autocomplete="off"></div>
+            <div class="field"><label for="fSym">ticker</label><input class="inp" id="fSym" maxlength="10" autocomplete="off" style="text-transform:uppercase"></div></div>
+          <div class="field"><label for="fDesc">description</label><textarea class="inp" id="fDesc" rows="3" maxlength="400"></textarea></div>
+          <div class="two"><div class="field"><label for="fX">x link (optional)</label><input class="inp" id="fX" placeholder="https://x.com/…" autocomplete="off"></div>
+            <div class="field"><label for="fWeb">website (optional)</label><input class="inp" id="fWeb" placeholder="default: its orbt page" autocomplete="off"></div></div>
+        </div>
+        <div>
+          <div class="field"><label>picture</label><canvas id="art" width="512" height="512"></canvas></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn s o" id="artNext" type="button">another style</button><label class="btn s o" style="cursor:pointer">use my own<input type="file" id="fImg" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label></div>
+          <p class="dim" style="font-size:11.5px;margin-top:6px">Drawn from the satellite’s real orbit: the planet under it right now, its inclination, its name and number.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" data-p="2">
+      <p class="dim" style="font-size:12.5px;margin-bottom:10px">Start from a rulebook or build your own. Up to six rules. Each one spends a share of the coin’s chest (its claimed creator fees) when it fires.</p>
+      <div class="tpls" id="tpls"></div>
+      <div id="rules"></div>
+      <button class="btn s o" id="addRule" type="button">+ add a rule</button>
+      <div class="con dark" style="margin-top:16px"><div class="ct" style="color:#8fb3a8">the rulebook<span class="r" style="color:#6f8a83">as the engine reads it</span></div><div class="code" id="bookOut"></div></div>
+    </div>
+
+    <div class="pane" data-p="3">
+      <div class="two">
+        <div>
+          <div class="field"><label for="fDev">first buy: <span id="devV">0.10</span> SOL (comes back to you as tokens)</label><input type="range" id="fDev" min="0.01" max="5" step="0.01" value="0.1" style="width:100%;accent-color:var(--acc)"></div>
+          <div class="sum" id="costs"></div>
+          <div class="field" style="margin-top:16px"><label for="fWal">your wallet (first buy and refunds go here)</label><input class="inp" id="fWal" placeholder="connect, or paste a Solana address" autocomplete="off"></div>
+          <label style="display:flex;gap:8px;font-size:12px;color:var(--ink2);align-items:flex-start"><input type="checkbox" id="fOk" style="margin-top:3px;accent-color:var(--acc)"> I understand the engine holds this coin’s wallet and fees (custodial) and spends them only as the rulebook says.</label>
+        </div>
+        <div><div class="sum" id="sum"></div></div>
+      </div>
+      <div class="out err" id="err" hidden></div>
+      <div id="flow" style="margin-top:16px"></div>
+    </div>
+    <div class="navb"><button class="btn o" id="prev" type="button" hidden>← back</button><span></span><button class="btn" id="next" type="button">next →</button></div>
+  </div>
+</main>
+<script src="/assets/js/satellite.min.js"></script>
+<script src="/assets/js/orb.js?v=1"></script>
+<script src="/assets/js/land.js"></script>
+<script src="/assets/js/rules.js?v=1"></script>
+<script src="/assets/js/core.js?v=1"></script>
+<script src="/assets/js/launch.js?v=1"></script>
+</body>
+</html>

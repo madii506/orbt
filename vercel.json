@@ -1,0 +1,23 @@
+{
+  "cleanUrls": true,
+  "functions": {
+    "api/launch.js": { "maxDuration": 60, "includeFiles": "assets/js/{rules,orb}.js" },
+    "api/tick.js": { "maxDuration": 60, "includeFiles": "assets/js/{rules,orb}.js" },
+    "api/sky.js": { "maxDuration": 60, "includeFiles": "assets/js/{rules,orb}.js" },
+    "api/coins.js": { "maxDuration": 25, "includeFiles": "assets/js/{rules,orb}.js" },
+    "api/meta.js": { "maxDuration": 15 }
+  },
+  "crons": [
+    { "path": "/api/tick", "schedule": "*/2 * * * *" },
+    { "path": "/api/sky?op=refresh", "schedule": "17 */1 * * *" }
+  ],
+  "rewrites": [
+    { "source": "/m/:id", "destination": "/api/meta?id=:id" },
+    { "source": "/i/:id", "destination": "/api/meta?img=:id" }
+  ],
+  "headers": [
+    { "source": "/assets/fonts/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+    { "source": "/assets/(css|js|img)/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" }] },
+    { "source": "/(.*)", "headers": [{ "key": "X-Content-Type-Options", "value": "nosniff" }, { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }] }
+  ]
+}

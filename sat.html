@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>orbt · satellite</title>
+<meta name="description" content="A satellite in orbit, tracked live, and its coin on orbt.">
+<meta property="og:image" content="/assets/img/og.png">
+<meta name="theme-color" content="#f6f3ec">
+<link rel="icon" href="/assets/img/fav64.png" type="image/png">
+<link rel="preload" href="/assets/fonts/JBM-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/orbt.css?v=1">
+<script>window.__cat = fetch('/api/sky?op=catalog').catch(() => null);</script>
+</head>
+<body>
+<canvas id="amb" aria-hidden="true"></canvas>
+<header class="bar">
+  <a class="logo" href="/">orbt<i>_</i></a>
+  <span class="seg"><span class="live"></span>UTC <b id="utc">--:--:--</b></span>
+  <span class="seg"><b id="nobj">…</b> objects tracked</span>
+  <span class="seg opt" id="issnow">ISS …</span>
+  <span class="sp"></span>
+  <nav class="nav"><a href="/#sky">sky</a><a href="/#catalogue">catalogue</a><a href="/#rules" class="opt">rules</a><a href="/#coins" class="opt">coins</a><a href="/#engine" class="opt">engine</a></nav>
+  <a class="cta" href="/launch">launch ↗</a>
+</header>
+<main>
+  <div class="wrap" id="page">
+    <div class="shead">
+      <div class="k" id="sk">satellite · loading the catalogue…</div>
+      <h1 id="sn">&nbsp;</h1>
+      <div class="chips" id="schips"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px" id="sacts"></div>
+    </div>
+    <div class="strip" id="strip">
+      <div><small>altitude</small><b id="vAlt">—</b></div><div><small>speed</small><b id="vSpd">—</b></div><div><small>over</small><b id="vPos">—</b></div>
+      <div><small>sun</small><b id="vSun">—</b></div><div><small>orbit</small><b id="vOrb">—</b></div><div><small>next lap</small><b id="vLap">—</b></div>
+    </div>
+    <div class="cols" style="margin-top:8px">
+      <div class="con c7"><div class="ct">where it is now<span class="r">drag to turn · its orbit ahead in blue</span></div><canvas id="sglobe"></canvas></div>
+      <div class="con c5"><div class="ct">its orbit<span class="r" id="epoch"></span></div><dl class="kv" id="facts"></dl>
+        <div class="ct" style="margin-top:18px">next passes over <span id="hereName" style="text-transform:none;letter-spacing:0">you</span><span class="r"><a href="/#overhead" class="acc">change place</a></span></div><div id="spass" class="olist"><div class="empty">Computing…</div></div></div>
+      <div class="con c12"><div class="ct">ground track · one orbit behind, one ahead<span class="r">today’s real day and night</span></div><canvas id="gtrack"></canvas></div>
+      <div class="c12" id="coinBox"></div>
+    </div>
+  </div>
+</main>
+<script src="/assets/js/satellite.min.js"></script>
+<script src="/assets/js/orb.js?v=1"></script>
+<script src="/assets/js/land.js"></script>
+<script src="/assets/js/rules.js?v=1"></script>
+<script src="/assets/js/core.js?v=1"></script>
+<script src="/assets/js/sky.js?v=1"></script>
+<script src="/assets/js/sat.js?v=1"></script>
+</body>
+</html>
