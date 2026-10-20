@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="/assets/img/fav180.png">
 <link rel="preload" href="/assets/fonts/JBM-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/JBM-800.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/orbt.css?v=4">
+<link rel="stylesheet" href="/assets/css/orbt.css?v=5">
 <script>if(location.search.indexOf("skip")<0)document.documentElement.classList.add("booting")</script>
 <script>window.__cat = fetch('/api/sky?op=catalog').catch(() => null);</script>
 </head>
@@ -37,10 +37,10 @@
 <section class="sky" id="sky">
   <canvas id="globe" aria-label="Live globe with every active satellite"></canvas>
   <div class="tip" id="tip"></div>
+  <div class="probe" id="probe"></div>
   <div class="ov tl">
-    <div class="k"><span class="live"></span>live · <span id="hcount">…</span> satellites · positions every second</div>
+    <div class="k"><span class="live"></span><span id="hcount">…</span> satellites, live</div>
     <h1>Every satellite<br>in orbit is <em>a coin.</em></h1>
-    <p>Real satellites, tracked live from public orbital data. Pick one, launch its coin on pump.fun and wire it to its orbit: every lap, every sunrise, every pass over a city can fire a buyback. When it falls back to Earth, the holders get the chest.</p>
     <div class="row"><a class="btn" href="/launch">launch a coin ↗</a><a class="btn o" href="#catalogue">browse the catalogue</a></div>
   </div>
   <div class="ov tr">
@@ -48,10 +48,10 @@
   </div>
   <div class="ov bl">
     <div class="chips" id="tags"></div>
-    <div class="hint">drag to turn the planet · click a dot to follow it · dim dots are in Earth’s shadow</div>
+    <div class="hint">drag · click · double-click</div>
   </div>
   <div class="zoomer"><button type="button" id="zIn" aria-label="zoom in">+</button><button type="button" id="zOut" aria-label="zoom out">−</button><button type="button" id="zTour" class="on" aria-label="tour">tour</button></div>
-  <div class="scale">altitude compressed: low orbit hugs the planet,<br>navigation shells float above, the geostationary ring sits outside</div>
+
 </section>
 
 <div class="tape"><div class="in" id="tape"></div></div>
@@ -208,8 +208,8 @@
 <script src="/assets/js/land.js"></script>
 <script src="/assets/js/rules.js?v=2"></script>
 <script src="/assets/js/core.js?v=3"></script>
-<script src="/assets/js/sky.js?v=2"></script>
-<script src="/assets/js/home.js?v=4"></script>
+<script src="/assets/js/sky.js?v=3"></script>
+<script src="/assets/js/home.js?v=5"></script>
 <script src="/assets/js/intro.js?v=5"></script>
 </body>
 </html>
