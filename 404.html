@@ -1,8 +1,46 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>orbt</title><link rel="icon" href="/assets/img/fav64.png"><link rel="stylesheet" href="/assets/css/orbt.css?v=1"></head>
-<body><main style="padding-top:0"><div class="wrap" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:16px">
-<pre style="color:var(--acc);font-size:13px;line-height:1.2">        .  *        =[]=  ~ ~ ~ ~
-   *         .     /
-        .        /     signal lost</pre>
-<h1 style="font:800 clamp(34px,6vw,72px)/1 var(--m);letter-spacing:-.04em">404 · no object<br>at this address.</h1>
-<p class="lede">This page decayed out of orbit, or never launched. Everything still flying is on the live sky.</p>
-<div><a class="btn" href="/">back to the sky →</a></div></div></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>orbt</title>
+<meta name="theme-color" content="#f6f3ec">
+<link rel="icon" href="/assets/img/fav64.png" type="image/png">
+<link rel="preload" href="/assets/fonts/JBM-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/orbt.css?v=7">
+</head>
+<body>
+<canvas id="amb" aria-hidden="true"></canvas>
+<header class="bar">
+  <a class="logo" href="/">orbt<i>_</i></a>
+  <span class="sp"></span>
+  <nav class="nav"><a href="/#sky">sky</a><a href="/#catalogue">catalogue</a><a href="/#rules" class="opt">rules</a><a href="/#engine" class="opt">engine</a></nav>
+  <a class="cta" href="/launch">launch ↗</a>
+</header>
+<main>
+  <div class="wrap lost">
+    <pre id="tumble" aria-hidden="true"></pre>
+    <h1>404 · no object<br>at this address.</h1>
+    <p class="lede">This page decayed out of orbit, or never launched. Everything still flying is on the live sky.</p>
+    <div class="row"><a class="btn" href="/">back to the sky →</a><a class="btn o" href="/#catalogue">browse the catalogue</a></div>
+  </div>
+</main>
+<script>
+(function () {
+  var el = document.getElementById('tumble'), F = ['=[]=', '\\[]\\', ' [] ', '/[]/'], W = 44, k = 0;
+  function frame() {
+    var t = k++, x = t % 40, rows = [[], [], []];
+    for (var r = 0; r < 3; r++) for (var c = 0; c < W + 14; c++) rows[r].push(' ');
+    for (var i = 8; i >= 1; i--) { var px = x - i * 2; if (px < 0) continue; var py = Math.min(2, Math.floor(px / 14)); rows[py][px] = i < 3 ? '~' : '.'; }
+    var g = F[t % 4], y = Math.min(2, Math.floor(x / 14)); for (var j = 0; j < g.length; j++) rows[y][x + j] = g[j];
+    var lost = 'signal lost'; if (x > 30 || t % 6 < 3) for (var q = 0; q < lost.length; q++) rows[2][W + 2 + q - 10] = lost[q];
+    el.textContent = rows.map(function (r) { return r.join(''); }).join('\n');
+  }
+  frame(); if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(frame, 160);
+})();
+</script>
+<script src="/assets/js/satellite.min.js"></script>
+<script src="/assets/js/orb.js?v=2"></script>
+<script src="/assets/js/core.js?v=3"></script>
+</body>
+</html>
